@@ -131,7 +131,6 @@ def parse(String description)
   def result = []
   def scale = getTemperatureScale()
   state?.scale = scale
-  def cluster = zigbee.parse(description)
 
   if (description?.startsWith("read attr -") || description?.startsWith("write attr -"))
   {
@@ -157,7 +156,6 @@ def parse(String description)
 
 def createCustomMap(descMap)
 {
-  def result = null
   def map = [: ]
   def scale = getTemperatureScale()
 
