@@ -15,20 +15,19 @@
 
  *  Sources:
  *  Sinopé => https://github.com/SmartThingsCommunity/SmartThingsPublic/blob/master/devicetypes/sinope-technologies/th1123zb-th1124zb-sinope-thermostat.src/th1123zb-th1124zb-sinope-thermostat.groovy
- *
  */
 
 preferences
 {
-  input("backlightAutoDimParam", "enum", title:"Backlight setting (default: sensing)", description: "On Demand or Sensing", options: ["On Demand", "Sensing"], multiple: false, required: false)
-  input("disableOutdoorTemperatureParam", "bool", title: "disable outdoor temperature", description: "Set it to true to Disable outdoor temperature on the thermostat")
-  input("timeFormatParam", "enum", title:"Time Format (Default: 24h)", options:["12h AM/PM","24h"], multiple: false, required: false, description: "Time format displayed by the device.")
-  input("trace", "bool", title: "Trace", description:"Set it to true to enable tracing")
+  input("backlightAutoDimParam", "enum", title:"Display backlight", options: ["On Demand", "Always On (Default)"], multiple: false, required: false)
+  input("disableOutdoorTemperatureParam", "bool", title: "Disable outdoor temperature")
+  input("timeFormatParam", "enum", title:"Clock display format", options:["12 Hour", "24 Hour (Default)"], multiple: false, required: false)
+  input("trace", "bool", title: "Enable debug logging")
 }
 
 metadata
 {
-  definition(name: "TH1123ZB Sinope Thermostat", namespace: "scoulombe", author: "scoulombe", ocfDeviceType: "oic.d.thermostat") {
+  definition(name: "TH1123ZB Sinope Thermostat", namespace: "fblackburn", author: "fblackburn", ocfDeviceType: "oic.d.thermostat") {
     capability "Configuration"
     capability "Thermostat"
     capability "Refresh"
@@ -38,6 +37,13 @@ metadata
     capability "Lock"
     capability "HealthCheck"
     capability "PowerMeter"
+
+    command "setThermostatMode", [[name:"Thermostat Mode",type:"ENUM", description:"Thermostat Mode", constraints:["off", "heat"]]]
+    command "emergencyHeat", [[name: "Not Supported"]]
+    command "auto", [[name: "Not Supported"]]
+    command "cool", [[name: "Not Supported"]]
+    command "fanCirculate", [[name: "Not Supported"]]
+    command "setCoolingSetpoint", [[name: "Not Supported"]]
 
     fingerprint manufacturer: "Sinope Technologies", model: "TH1123ZB", deviceJoinName: "Sinope TH1123ZB Thermostat", inClusters: "0000,0003,0004,0005,0201,0204,0402,0B04,0B05,FF01", outClusters: "0019,FF01"
   }
@@ -356,14 +362,14 @@ void refresh_misc()
     cmds += zigbee.writeAttribute(0x0201, 0x0402, DataType.ENUM8, 0x0001)
 
   // TimeFormat
-  if(timeFormatParam == "12h AM/PM")
+  if(timeFormatParam == "12 Hour")
   {
-    //12h AM/PM
+    // 12 Hour
     cmds += zigbee.writeAttribute(0xFF01, 0x0114, 0x30, 0x0001)
   }
   else
   {
-    //24h
+    // 24 Hour
     cmds += zigbee.writeAttribute(0xFF01, 0x0114, 0x30, 0x0000)
   }
 
