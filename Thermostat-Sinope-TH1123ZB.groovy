@@ -7,11 +7,14 @@
  *  0.1   (2019-12-20) => First release
  *  0.2   (2019-12-21) => Added Lock / Unlock setting / HealthCheck
  *  0.3   (2019-12-22) => Fixed thermostat mode reporting, added thermostat mode setting, added power reporting (?)
+ *  0.4   (2021-12-12) => Add changes from Smartthing driver v1.2.0
  *
- *  Author: scoulombe
- *
+ *  Author(0.1-0.3): scoulombe
  *  Date: 2019-12-22
  *
+ *  Author(0.4+): fblackburn
+ *  Date: 2021-12-12
+
  *  Sources:
  *  Sinopé => https://github.com/SmartThingsCommunity/SmartThingsPublic/blob/master/devicetypes/sinope-technologies/th1123zb-th1124zb-sinope-thermostat.src/th1123zb-th1124zb-sinope-thermostat.groovy
  *
@@ -22,6 +25,7 @@ preferences
   input("BacklightAutoDimParam", "enum", title:"Backlight setting (default: sensing)", description: "On Demand or Sensing", options: ["On Demand", "Sensing"], multiple: false, required: false)
   input("DisableOutdorTemperatureParam", "bool", title: "disable outdoor temperature", description: "Set it to true to Disable outdoor temperature on the thermostat")
   input("keyboardLockParam", "bool", title: "enable the lock", description: "Set to true to enable the lock on the thermostat")
+  input("timeFormatParam", "enum", title:"Time Format (Default: 24h)", options:["12h AM/PM","24h"], multiple: false, required: false, description: "Time format displayed by the device.")
   input("trace", "bool", title: "Trace", description:"Set it to true to enable tracing")
 }
 
@@ -55,7 +59,7 @@ def updated()
   if (settings.trace)
     log.trace "TH1123ZB >> updated()"
 
-  if (!state.updatedLastRanAt || now() >= state.updatedLastRanAt + 5000)
+  if (!state.updatedLastRanAt || now() >= state.updatedLastRanAt + 1000)
   {
     state.updatedLastRanAt = now()
 
@@ -80,8 +84,19 @@ def configure()
   if (settings.trace)
     log.trace "TH1123ZB >> configure()"
 
-  // Allow 30 min without receiving temperature report
-  return sendEvent(name: "checkInterval", value: 30*60, displayed: false, data: [protocol: "zigbee", hubHardwareId: device.hub.hardwareID])
+   def cmds = []
+   cmds += zigbee.configureReporting(0x0201, 0x0000, DataType.INT16, 19, 301, 50)      // local temperature
+   cmds += zigbee.configureReporting(0x0201, 0x0008, DataType.UINT8, 4, 300, 10)       // heating demand
+   cmds += zigbee.configureReporting(0x0201, 0x0012, DataType.INT16, 15, 302, 40)      // occupied heating setpoint
+   cmds += zigbee.configureReporting(0x0B04, 0x050B, DataType.INT16, 30, 599, 0x64)    // configure reporting of active power ... ?
+
+   if(cmds)
+   {
+    fireCommand(cmds)
+   }
+
+  // Allow 5 min without receiving temperature report
+  return sendEvent(name: "checkInterval", value: 300, displayed: false, data: [protocol: "zigbee", hubHardwareId: device.hub.hardwareID])
 }
 
 void initialize()
@@ -91,11 +106,13 @@ void initialize()
 
   runIn(2, refresh)
   runEvery15Minutes(refresh_misc)
+  refresh()
 }
 
 def ping()
 {
-  refresh()
+  def cmds = zigbee.readAttribute(0x0201, 0x0000);
+  fireCommand(cmds)
 }
 
 def uninstalled()
@@ -116,7 +133,7 @@ def parse(String description)
   state?.scale = scale
   def cluster = zigbee.parse(description)
 
-  if (description?.startsWith("read attr -"))
+  if (description?.startsWith("read attr -") || description?.startsWith("write attr -"))
   {
     def descMap = zigbee.parseDescriptionAsMap(description)
 
@@ -149,7 +166,8 @@ def createCustomMap(descMap)
     map.name = "temperature"
     map.value = getTemperatureValue(descMap.value)
     sendEvent(name: map.name, value: map.value, unit: scale)
-    sendEvent(name: "checkInterval", value: 30*60, displayed: false, data: [protocol: "zigbee", hubHardwareId: device.hub.hardwareID])
+    //allow 5 min without receiving temperature report
+    sendEvent(name: "checkInterval", value: 300, displayed: false, data: [protocol: "zigbee", hubHardwareId: device.hub.hardwareID])
   }
   else if (descMap.cluster == "0201" && descMap.attrId == "0008")
   {
@@ -296,11 +314,9 @@ def refresh()
   if (settings.trace)
     log.trace "TH1123ZB >> refresh()"
 
-  if (!state.updatedLastRanAt || now() >= state.updatedLastRanAt + 20000)
+  if (!state.updatedLastRanAt || now() >= state.updatedLastRanAt + 5000)
   {
     state.updatedLastRanAt = now()
-
-    state?.scale = getTemperatureScale()
 
     def cmds = []
 
@@ -311,18 +327,12 @@ def refresh()
     cmds += zigbee.readAttribute(0x0204, 0x0001)  // Rd thermostat Keypad lock
 
     cmds += zigbee.readAttribute(0x0B04, 0x050B)  // Rd thermostat Active power ?
-
-    cmds += zigbee.configureReporting(0x0201, 0x0000, DataType.INT16, 19, 301, 50)      // local temperature
-    cmds += zigbee.configureReporting(0x0201, 0x0008, DataType.UINT8, 4, 300, 10)       // heating demand
-    cmds += zigbee.configureReporting(0x0201, 0x0012, DataType.INT16, 15, 302, 40)      // occupied heating setpoint
-    cmds += zigbee.configureReporting(0x0B04, 0x050B, DataType.INT16, 30, 599, 0x64)    // configure reporting of active power ... ?
-
     return cmds
   }
   else
   {
     if (settings.trace)
-      log.trace "TH1123ZB >> refresh() --- Ran within last 20 seconds so aborting"
+      log.trace "TH1123ZB >> refresh() --- Ran within last 5 seconds so aborting"
   }
 }
 
@@ -343,8 +353,6 @@ void refresh_misc()
       cmds += zigbee.writeAttribute(0xFF01, 0x0010, DataType.INT16, zigbee.convertHexToInt(hex(outdoorTemp * 100)), [mfgCode: "0x119C"], 1000)
     }
   }
-  else
-    cmds += zigbee.writeAttribute(0xFF01, 0x0011, DataType.UINT16, 30) // Set the outdoor temperature timeout to 30sec
 
   // Backlight
   if (BacklightAutoDimParam == "On Demand")
@@ -357,6 +365,18 @@ void refresh_misc()
     unlock()
   else
     lock()
+
+  // TimeFormat
+  if(timeFormatParam == "12h AM/PM")
+  {
+    //12h AM/PM
+    cmds += zigbee.writeAttribute(0xFF01, 0x0114, 0x30, 0x0001)
+  }
+  else
+  {
+    //24h
+    cmds += zigbee.writeAttribute(0xFF01, 0x0114, 0x30, 0x0000)
+  }
 
   // Time
   def thermostatDate = new Date();
@@ -394,6 +414,7 @@ def setHeatingSetpoint(degrees)
 
   def cmds = []
   cmds += zigbee.writeAttribute(0x0201, 0x12, DataType.INT16,  zigbee.convertHexToInt(hex(celsius * 100)))
+  cmds += zigbee.readAttribute(0x0201, 0x0012)
 
   return cmds
 }
@@ -403,32 +424,14 @@ void off()
   setThermostatMode('off')
 }
 
-void auto()
-{
-  setThermostatMode('auto')
-}
-
 void heat()
 {
   setThermostatMode('heat')
 }
 
-void emergencyHeat()
-{
-  setThermostatMode('heat')
-}
-
-void cool()
-{
-  setThermostatMode('cool')
-}
-
 def getSupportedThermostatModes()
 {
-  if (!state?.supportedThermostatModes)
-    state?.supportedThermostatModes = (device.currentValue("supportedThermostatModes")) ? device.currentValue("supportedThermostatModes").toString().minus('[').minus(']').tokenize(',') : ['off', 'heat']
-
-  return state?.supportedThermostatModes
+  ['heat', 'off']
 }
 
 def setThermostatMode(mode)
@@ -448,11 +451,9 @@ def mode_off()
   if (settings.trace)
     log.trace "TH1123ZB >> mode_off()"
 
-  sendEvent(name: "thermostatMode", value: "off", data: [supportedThermostatModes: getSupportedThermostatModes()])
-
   def cmds = []
   cmds += zigbee.writeAttribute(0x0201, 0x001C, 0x30, 0)
-  cmds += zigbee.readAttribute(0x0201, 0x0008)
+  cmds += zigbee.readAttribute(0x0201, 0x001C)
 
   fireCommand(cmds)
 }
@@ -462,11 +463,9 @@ def mode_heat()
   if (settings.trace)
     log.trace "TH1123ZB >> mode_heat()"
 
-  sendEvent(name: "thermostatMode", value: "heat", data: [supportedThermostatModes: getSupportedThermostatModes()])
-
   def cmds = []
   cmds += zigbee.writeAttribute(0x0201, 0x001C, 0x30, 4)
-  cmds += zigbee.readAttribute(0x0201, 0x0008)
+  cmds += zigbee.readAttribute(0x0201, 0x001C)
 
   fireCommand(cmds)
 }
