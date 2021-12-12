@@ -1,13 +1,11 @@
-
 /**
- *
  *  Thermostat Sinopé TH1123ZB Driver
  *
  *  Version: 0.3
  *  0.1   (2019-12-20) => First release
  *  0.2   (2019-12-21) => Added Lock / Unlock setting / HealthCheck
  *  0.3   (2019-12-22) => Fixed thermostat mode reporting, added thermostat mode setting, added power reporting (?)
- *  0.4   (2021-12-12) => Add changes from Smartthing driver v1.2.0
+ *  0.4   (2021-12-12) => Add changes from SmartThings driver v1.2.0
  *
  *  Author(0.1-0.3): scoulombe
  *  Date: 2019-12-22
