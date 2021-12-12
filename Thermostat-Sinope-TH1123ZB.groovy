@@ -24,7 +24,6 @@ preferences
 {
   input("backlightAutoDimParam", "enum", title:"Backlight setting (default: sensing)", description: "On Demand or Sensing", options: ["On Demand", "Sensing"], multiple: false, required: false)
   input("disableOutdoorTemperatureParam", "bool", title: "disable outdoor temperature", description: "Set it to true to Disable outdoor temperature on the thermostat")
-  input("keyboardLockParam", "bool", title: "enable the lock", description: "Set to true to enable the lock on the thermostat")
   input("timeFormatParam", "enum", title:"Time Format (Default: 24h)", options:["12h AM/PM","24h"], multiple: false, required: false, description: "Time format displayed by the device.")
   input("trace", "bool", title: "Trace", description:"Set it to true to enable tracing")
 }
@@ -357,12 +356,6 @@ void refresh_misc()
     cmds += zigbee.writeAttribute(0x0201, 0x0402, DataType.ENUM8, 0x0000)
   else
     cmds += zigbee.writeAttribute(0x0201, 0x0402, DataType.ENUM8, 0x0001)
-
-  // Lock / Unlock
-  if (keyboardLockParam != true)
-    unlock()
-  else
-    lock()
 
   // TimeFormat
   if(timeFormatParam == "12h AM/PM")
