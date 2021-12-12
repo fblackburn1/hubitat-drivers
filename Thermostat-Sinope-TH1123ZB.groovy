@@ -22,8 +22,8 @@
 
 preferences
 {
-  input("BacklightAutoDimParam", "enum", title:"Backlight setting (default: sensing)", description: "On Demand or Sensing", options: ["On Demand", "Sensing"], multiple: false, required: false)
-  input("DisableOutdorTemperatureParam", "bool", title: "disable outdoor temperature", description: "Set it to true to Disable outdoor temperature on the thermostat")
+  input("backlightAutoDimParam", "enum", title:"Backlight setting (default: sensing)", description: "On Demand or Sensing", options: ["On Demand", "Sensing"], multiple: false, required: false)
+  input("disableOutdoorTemperatureParam", "bool", title: "disable outdoor temperature", description: "Set it to true to Disable outdoor temperature on the thermostat")
   input("keyboardLockParam", "bool", title: "enable the lock", description: "Set to true to enable the lock on the thermostat")
   input("timeFormatParam", "enum", title:"Time Format (Default: 24h)", options:["12h AM/PM","24h"], multiple: false, required: false, description: "Time format displayed by the device.")
   input("trace", "bool", title: "Trace", description:"Set it to true to enable tracing")
@@ -156,7 +156,7 @@ def parse(String description)
 
 def createCustomMap(descMap)
 {
-  def map = [: ]
+  def map = [:]
   def scale = getTemperatureScale()
 
   if (descMap.cluster == "0201" && descMap.attrId == "0000")
@@ -339,7 +339,7 @@ void refresh_misc()
   def cmds = []
 
   // Outdoor temperature
-  if (!settings.DisableOutdorTemperatureParam)
+  if (!settings.disableOutdoorTemperatureParam)
   {
     float outdoorTemp;
 
@@ -353,7 +353,7 @@ void refresh_misc()
   }
 
   // Backlight
-  if (BacklightAutoDimParam == "On Demand")
+  if (backlightAutoDimParam == "On Demand")
     cmds += zigbee.writeAttribute(0x0201, 0x0402, DataType.ENUM8, 0x0000)
   else
     cmds += zigbee.writeAttribute(0x0201, 0x0402, DataType.ENUM8, 0x0001)
@@ -411,7 +411,7 @@ def setHeatingSetpoint(degrees)
   def celsius = (scale == "C") ? degreesDouble : (fahrenheitToCelsius(degreesDouble) as Double).round(1)
 
   def cmds = []
-  cmds += zigbee.writeAttribute(0x0201, 0x12, DataType.INT16,  zigbee.convertHexToInt(hex(celsius * 100)))
+  cmds += zigbee.writeAttribute(0x0201, 0x0012, DataType.INT16,  zigbee.convertHexToInt(hex(celsius * 100)))
   cmds += zigbee.readAttribute(0x0201, 0x0012)
 
   return cmds
