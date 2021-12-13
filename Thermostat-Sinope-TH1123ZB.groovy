@@ -91,6 +91,7 @@ def configure()
    cmds += zigbee.configureReporting(0x0201, 0x0000, DataType.INT16, 19, 301, 50)      // local temperature
    cmds += zigbee.configureReporting(0x0201, 0x0008, DataType.UINT8, 4, 300, 10)       // heating demand
    cmds += zigbee.configureReporting(0x0201, 0x0012, DataType.INT16, 15, 302, 40)      // occupied heating setpoint
+   // FIXME: Doesn't seem to work
    cmds += zigbee.configureReporting(0x0B04, 0x050B, DataType.INT16, 30, 599, 0x64)    // configure reporting of active power ... ?
 
    if(cmds)
@@ -178,6 +179,7 @@ def createCustomMap(descMap)
     sendEvent(name: map.name, value: map.value, unit: "%")
     def operatingState = (map.value.toInteger() < 10) ? "idle" : "heating"
     sendEvent(name: "thermostatOperatingState", value: operatingState)
+    runIn(1, requestPower)
   }
   else if (descMap.cluster == "0B04" && descMap.attrId == "050B")
   {
@@ -505,4 +507,11 @@ private hex(value)
   String hex = new BigInteger(Math.round(value).toString()).toString(16)
 
   return hex
+}
+
+def requestPower()
+{
+  def cmds = []
+  cmds += zigbee.readAttribute(0x0B04, 0x050B)
+  fireCommand(cmds)
 }
