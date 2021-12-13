@@ -114,7 +114,8 @@ void initialize()
 
 def ping()
 {
-  def cmds = zigbee.readAttribute(0x0201, 0x0000);
+  def cmds = []
+  cmds += zigbee.readAttribute(0x0201, 0x0000)
   fireCommand(cmds)
 }
 
@@ -174,7 +175,7 @@ def createCustomMap(descMap)
   {
     map.name = "heatingDemand"
     map.value = getHeatingDemand(descMap.value)
-    sendEvent(name: map.name, value: map.value)
+    sendEvent(name: map.name, value: map.value, unit: "%")
     def operatingState = (map.value.toInteger() < 10) ? "idle" : "heating"
     sendEvent(name: "thermostatOperatingState", value: operatingState)
   }
@@ -182,7 +183,7 @@ def createCustomMap(descMap)
   {
     map.name = "power"
     map.value = getActivePower(descMap.value)
-    sendEvent(name: map.name, value: map.value)
+    sendEvent(name: map.name, value: map.value, unit: "W")
   }
   else if (descMap.cluster == "0201" && descMap.attrId == "0012")
   {
