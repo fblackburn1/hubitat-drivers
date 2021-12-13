@@ -96,7 +96,7 @@ def configure()
 
    if(cmds)
    {
-    fireCommand(cmds)
+    sendCommands(cmds)
    }
 
   // Allow 5 min without receiving temperature report
@@ -117,7 +117,7 @@ def ping()
 {
   def cmds = []
   cmds += zigbee.readAttribute(0x0201, 0x0000)
-  fireCommand(cmds)
+  sendCommands(cmds)
 }
 
 def uninstalled()
@@ -297,7 +297,7 @@ def unlock()
   def cmds = []
   cmds += zigbee.writeAttribute(0x0204, 0x0001, DataType.ENUM8, 0x00)
 
-  fireCommand(cmds)
+  sendCommands(cmds)
 }
 
 def lock()
@@ -310,7 +310,7 @@ def lock()
   def cmds = []
   cmds += zigbee.writeAttribute(0x0204, 0x0001, DataType.ENUM8, 0x01)
 
-  fireCommand(cmds)
+  sendCommands(cmds)
 }
 
 def refresh()
@@ -391,7 +391,7 @@ void refresh_misc()
     cmds += zigbee.writeAttribute(0x0204, 0x0000, DataType.ENUM8, 1)  // °F on thermostat display
 
   if (cmds)
-    fireCommand(cmds)
+    sendCommands(cmds)
 }
 
 def setHeatingSetpoint(degrees)
@@ -453,7 +453,7 @@ def mode_off()
   cmds += zigbee.writeAttribute(0x0201, 0x001C, 0x30, 0)
   cmds += zigbee.readAttribute(0x0201, 0x001C)
 
-  fireCommand(cmds)
+  sendCommands(cmds)
 }
 
 def mode_heat()
@@ -465,7 +465,7 @@ def mode_heat()
   cmds += zigbee.writeAttribute(0x0201, 0x001C, 0x30, 4)
   cmds += zigbee.readAttribute(0x0201, 0x001C)
 
-  fireCommand(cmds)
+  sendCommands(cmds)
 }
 
 private def checkTemperature(def number)
@@ -490,7 +490,7 @@ private def checkTemperature(def number)
   return number
 }
 
-private fireCommand(List commands)
+private sendCommands(List commands)
 {
   if (commands != null && commands.size() > 0)
   {
@@ -513,5 +513,5 @@ def requestPower()
 {
   def cmds = []
   cmds += zigbee.readAttribute(0x0B04, 0x050B)
-  fireCommand(cmds)
+  sendCommands(cmds)
 }
