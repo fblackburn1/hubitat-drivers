@@ -20,7 +20,6 @@
 preferences
 {
   input("backlightAutoDimParam", "enum", title:"Display backlight", options: ["On Demand", "Always On (Default)"], multiple: false, required: false)
-  input("disableOutdoorTemperatureParam", "bool", title: "Disable outdoor temperature")
   input("timeFormatParam", "enum", title:"Clock display format", options:["12 Hour", "24 Hour (Default)"], multiple: false, required: false)
   input("trace", "bool", title: "Enable debug logging")
 }
@@ -44,6 +43,8 @@ metadata
     command "cool", [[name: "Not Supported"]]
     command "fanCirculate", [[name: "Not Supported"]]
     command "setCoolingSetpoint", [[name: "Not Supported"]]
+    command "setOutdoorTemperature", [[name: "Outdoor Temperature", type: "NUMBER", description: "set 'off' to display temperature heating set point"]]
+    command "displayTemperature", [[name: "Display Temperature", type: "ENUM", description: "Temperature to display", constraints: ["Outdoor", "Setpoint"]]]
 
     fingerprint manufacturer: "Sinope Technologies", model: "TH1123ZB", deviceJoinName: "Sinope TH1123ZB Thermostat", inClusters: "0000,0003,0004,0005,0201,0204,0402,0B04,0B05,FF01", outClusters: "0019,FF01"
   }
@@ -340,23 +341,50 @@ def refresh()
   }
 }
 
+
+void setOutdoorTemperature(Float outdoorTemp)
+{
+  state.outdoorTemperature = outdoorTemp
+  if (state.displayTemperature == 'Setpoint')
+  {
+    return
+  }
+  sendOutdoorTemperature(outdoorTemp)
+}
+
+
+void displayTemperature(String choice)
+{
+  if (state.outdoorTemperature && choice == 'Outdoor')
+  {
+    sendOutdoorTemperature(state.outdoorTemperature)
+  }
+  else
+  {
+    sendSetpointTemperature()
+  }
+  state.displayTemperature = choice
+}
+
+private void sendOutdoorTemperature(Float outdoorTemp)
+{
+  def cmds = []
+  def outdoorTempHex = zigbee.convertHexToInt(hex(outdoorTemp * 100))
+  cmds += zigbee.writeAttribute(0xFF01, 0x0011, DataType.UINT16, 10800, [:], 1000) // Set the outdoor temperature timeout to 3 hours
+  cmds += zigbee.writeAttribute(0xFF01, 0x0010, DataType.INT16, outdoorTempHex, [mfgCode: "0x119C"], 1000)
+  sendCommands(cmds)
+}
+
+private void sendSetpointTemperature()
+{
+  def cmds = []
+  cmds += zigbee.writeAttribute(0xFF01, 0x0010, DataType.INT16, 0x8000)
+  sendCommands(cmds)
+}
+
 void refresh_misc()
 {
   def cmds = []
-
-  // Outdoor temperature
-  if (!settings.disableOutdoorTemperatureParam)
-  {
-    float outdoorTemp;
-
-    // Read some outdoor temperature here ...
-
-    if (outdoorTemp)
-    {
-      cmds += zigbee.writeAttribute(0xFF01, 0x0011, DataType.UINT16, 10800, [:], 1000) // Set the outdoor temperature timeout to 3 hours
-      cmds += zigbee.writeAttribute(0xFF01, 0x0010, DataType.INT16, zigbee.convertHexToInt(hex(outdoorTemp * 100)), [mfgCode: "0x119C"], 1000)
-    }
-  }
 
   // Backlight
   if (backlightAutoDimParam == "On Demand")
