@@ -455,6 +455,11 @@ void heat()
   setThermostatMode('heat')
 }
 
+void cool() {}
+void auto() {}
+void emergencyHeat() {}
+void setCoolingSetpoint() {}
+
 def getSupportedThermostatModes()
 {
   ['heat', 'off']
