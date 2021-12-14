@@ -78,8 +78,7 @@ def updated()
     {
     }
 
-    runIn(1, refresh_misc)
-    runEvery15Minutes(refresh_misc)
+    refresh_misc()
   }
 }
 
@@ -109,8 +108,7 @@ void initialize()
   if (settings.trace)
     log.trace "TH1123ZB >> initialize()"
 
-  runIn(2, refresh)
-  runEvery15Minutes(refresh_misc)
+  refresh_misc()
   refresh()
 }
 
@@ -418,8 +416,7 @@ void refresh_misc()
   else
     cmds += zigbee.writeAttribute(0x0204, 0x0000, DataType.ENUM8, 1)  // °F on thermostat display
 
-  if (cmds)
-    sendCommands(cmds)
+  sendCommands(cmds)
 }
 
 def setHeatingSetpoint(degrees)
