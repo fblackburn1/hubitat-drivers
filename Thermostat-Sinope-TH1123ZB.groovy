@@ -5,17 +5,17 @@
 /* groovylint-disable UnnecessaryGetter */
 /* groovylint-disable UnnecessarySetter */
 /**
- *  Thermostat Sinopé TH1123ZB Driver
+ *  Thermostat Sinopé TH1123ZB-TH1124ZB Driver
  *
  *  Version: 0.3
  *  0.1   (2019-12-20) => First release
  *  0.2   (2019-12-21) => Added Lock / Unlock setting / HealthCheck
  *  0.3   (2019-12-22) => Fixed thermostat mode reporting, added thermostat mode setting, added power reporting (?)
- *  0.4   (2021-12-12) => Add changes from SmartThings driver v1.2.0
- *
  *  Author(0.1-0.3): scoulombe
  *  Date: 2019-12-22
  *
+ *  0.4   (2021-12-12) => Added changes from SmartThings driver v1.2.0
+ *  0.5   (2021-12-15) => Added possibility to set outdoor temperature from command and fixed power reporting event
  *  Author(0.4+): fblackburn
  *  Date: 2021-12-12
  */
@@ -51,7 +51,7 @@ preferences
 metadata
 {
     definition(
-        name: 'TH1123ZB Sinope Thermostat',
+        name: 'TH1123ZB-TH1124ZB Sinope Thermostat',
         namespace: 'fblackburn',
         author: 'fblackburn',
         ocfDeviceType: 'oic.d.thermostat'
@@ -104,7 +104,7 @@ metadata
         fingerprint(
             manufacturer: 'Sinope Technologies',
             model: 'TH1123ZB',
-            deviceJoinName: 'Sinope TH1123ZB Thermostat',
+            deviceJoinName: 'Sinope TH1123ZB-TH1124ZB Thermostat',
             inClusters: '0000,0003,0004,0005,0201,0204,0402,0B04,0B05,FF01',
             outClusters: '0019,FF01',
         )
@@ -113,7 +113,7 @@ metadata
 
 void installed() {
     if (settings.trace) {
-        log.trace 'TH1123ZB >> installed()'
+        log.trace 'TH112XZB >> installed()'
     }
 
     initialize()
@@ -121,14 +121,14 @@ void installed() {
 
 void updated() {
     if (settings.trace) {
-        log.trace 'TH1123ZB >> updated()'
+        log.trace 'TH112XZB >> updated()'
     }
 
     if (!state.updatedLastRanAt || now() >= state.updatedLastRanAt + 1000) {
         state.updatedLastRanAt = now()
 
         if (settings.trace) {
-            log.trace 'TH1123ZB >> updated() => Device is now updated'
+            log.trace 'TH112XZB >> updated() => Device is now updated'
         }
 
         try {
@@ -142,7 +142,7 @@ void updated() {
 
 void configure() {
     if (settings.trace) {
-        log.trace 'TH1123ZB >> configure()'
+        log.trace 'TH112XZB >> configure()'
     }
 
     // Configure reporting ...
@@ -166,7 +166,7 @@ void configure() {
 
 void initialize() {
     if (settings.trace) {
-        log.trace 'TH1123ZB >> initialize()'
+        log.trace 'TH112XZB >> initialize()'
     }
 
     refresh_misc()
@@ -207,7 +207,7 @@ List parse(String description) {
         }
     }
     else if (!description?.startsWith('catchall:')) {
-        log.trace 'TH1123ZB >> parse(description) ==> ' + description
+        log.trace 'TH112XZB >> parse(description) ==> ' + description
     }
 
     return result
@@ -275,7 +275,7 @@ Map getLockMap() {
 
 void unlock() {
     if (settings.trace) {
-        log.trace 'TH1123ZB >> unlock()'
+        log.trace 'TH112XZB >> unlock()'
     }
 
     sendEvent(name: 'lock', value: 'unlocked')
@@ -287,7 +287,7 @@ void unlock() {
 
 void lock() {
     if (settings.trace) {
-        log.trace 'TH1123ZB >> lock()'
+        log.trace 'TH112XZB >> lock()'
     }
 
     sendEvent(name: 'lock', value: 'locked')
@@ -299,7 +299,7 @@ void lock() {
 
 void refresh() {
     if (settings.trace) {
-        log.trace 'TH1123ZB >> refresh()'
+        log.trace 'TH112XZB >> refresh()'
     }
 
     if (!state.updatedLastRanAt || now() >= state.updatedLastRanAt + 5000) {
@@ -315,7 +315,7 @@ void refresh() {
         sendCommands(cmds)
     }
     if (settings.trace) {
-        log.trace 'TH1123ZB >> refresh() --- Ran within last 5 seconds so aborting'
+        log.trace 'TH112XZB >> refresh() --- Ran within last 5 seconds so aborting'
     }
 }
 
@@ -432,7 +432,7 @@ List<String> getSupportedThermostatModes() {
 
 void setThermostatMode(String mode) {
     if (settings.trace) {
-        log.trace "TH1123ZB >> setThermostatMode(${mode})"
+        log.trace "TH112XZB >> setThermostatMode(${mode})"
     }
 
     String modeLower = mode?.toLowerCase()
@@ -445,7 +445,7 @@ void setThermostatMode(String mode) {
 
 void mode_off() {
     if (settings.trace) {
-        log.trace 'TH1123ZB >> mode_off()'
+        log.trace 'TH112XZB >> mode_off()'
     }
 
     List cmds = []
@@ -456,7 +456,7 @@ void mode_off() {
 
 void mode_heat() {
     if (settings.trace) {
-        log.trace 'TH1123ZB >> mode_heat()'
+        log.trace 'TH112XZB >> mode_heat()'
     }
 
     List cmds = []
@@ -518,7 +518,7 @@ private Map convertCustomMap(Map descMap) {
         sendEvent(name: map.name, value: map.value)
     }
     else {
-        log.trace 'TH1123ZB >> convertCustomMap(descMap) ==> ' + descMap
+        log.trace 'TH112XZB >> convertCustomMap(descMap) ==> ' + descMap
     }
 
     return map
