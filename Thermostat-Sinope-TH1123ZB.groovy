@@ -542,6 +542,7 @@ private void sendSetpointTemperature() {
 private Double checkTemperature(Double temperature) {
     String scale = getTemperatureScale()
     Double number = temperature
+    Integer maxCelcius = 25
 
     if (scale == 'F') {
         if (number < 41) {
@@ -555,8 +556,8 @@ private Double checkTemperature(Double temperature) {
         if (number < 5) {
             number = 5
         }
-        else if (number > 30) {
-            number = 3
+        else if (number > maxCelcius) {
+            number = maxCelcius
         }
     }
 
