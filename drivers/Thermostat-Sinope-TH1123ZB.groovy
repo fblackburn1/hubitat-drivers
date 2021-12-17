@@ -176,10 +176,9 @@ void initialize() {
 }
 
 void ping() {
-    runIn(1, requestPower)
-    //List cmds = []
-    //cmds += zigbee.readAttribute(0x0201, 0x0000) // temperature
-    //sendCommands(cmds)
+    List cmds = []
+    cmds += zigbee.readAttribute(0x0201, 0x0000) // temperature
+    sendCommands(cmds)
 }
 
 void uninstalled() {
