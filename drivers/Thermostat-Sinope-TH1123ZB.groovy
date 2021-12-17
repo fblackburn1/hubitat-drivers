@@ -184,7 +184,7 @@ void ping() {
 
 void uninstalled() {
     try {
-      unschedule()
+        unschedule()
     }
     catch (ignored) { }
 }
