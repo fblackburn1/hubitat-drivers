@@ -21,3 +21,6 @@ jobs:
         node-version: ${{ matrix.node-version }}
     - run: npm install npm-groovy-lint
     - run: node_modules/.bin/npm-groovy-lint --path drivers --no-insight --noserver --failon info
+
+    - run: npm install markdownlint-cli
+    - run: node_modules/.bin/markdownlint *.md
