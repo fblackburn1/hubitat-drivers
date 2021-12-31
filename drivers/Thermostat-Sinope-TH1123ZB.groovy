@@ -188,15 +188,15 @@ void uninstalled() {
     catch (ignored) { }
 }
 
-Event parse(String description) {
+Map parse(String description) {
     if (!description?.startsWith('read attr -')) {
         if (!description?.startsWith('catchall:')) {
             log.trace 'TH112XZB >> parse(description) ==> ' + description
         }
-        return
+        return [:]
     }
 
-    Event event
+    Map event = [:]
     String scale = getTemperatureScale()
     Map descMap = zigbee.parseDescriptionAsMap(description)
     state?.scale = scale
