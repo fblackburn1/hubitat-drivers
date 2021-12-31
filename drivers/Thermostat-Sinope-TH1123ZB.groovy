@@ -246,66 +246,6 @@ Event parse(String description) {
     return event
 }
 
-Double getTemperatureValue(String value, Boolean doRounding = false) {
-    String scale = state?.scale
-
-    if (value != null) {
-        Double celsius = (Integer.parseInt(value, 16) / 100).toDouble()
-
-        if (scale == 'C') {
-            if (doRounding) {
-                String tempValueString = String.format('%2.1f', celsius)
-
-                if (tempValueString.matches('.*([.,][456])')) {
-                    tempValueString = String.format('%2d.5', celsius.intValue())
-                }
-
-                else if (tempValueString.matches('.*([.,][789])')) {
-                    celsius = celsius.intValue() + 1
-                    tempValueString = String.format('%2d.0', celsius.intValue())
-                }
-                else {
-                    tempValueString = String.format('%2d.0', celsius.intValue())
-                }
-
-                return tempValueString.toDouble().round(1)
-            }
-            return celsius.round(1)
-        }
-        return Math.round(celsiusToFahrenheit(celsius))
-    }
-}
-
-String getHeatingDemand(String value) {
-    if (value == null) {
-        return
-    }
-    Integer demand = Integer.parseInt(value, 16)
-    return demand.toString()
-}
-
-Integer getActivePower(String value) {
-    if (value == null) {
-        return
-    }
-    Integer activePower = Integer.parseInt(value, 16)
-    return activePower
-}
-
-Map getModeMap() {
-    return [
-        '00': 'off',
-        '04': 'heat'
-    ]
-}
-
-Map getLockMap() {
-    return [
-        '00': 'unlocked ',
-        '01': 'locked ',
-    ]
-}
-
 void unlock() {
     if (settings.trace) {
         log.trace 'TH112XZB >> unlock()'
@@ -546,6 +486,70 @@ private Double checkTemperature(Double temperature) {
     return number
 }
 
+private Double getTemperatureValue(String value, Boolean doRounding = false) {
+    String scale = state?.scale
+
+    if (value != null) {
+        Double celsius = (Integer.parseInt(value, 16) / 100).toDouble()
+
+        if (scale == 'C') {
+            if (doRounding) {
+                String tempValueString = String.format('%2.1f', celsius)
+
+                if (tempValueString.matches('.*([.,][456])')) {
+                    tempValueString = String.format('%2d.5', celsius.intValue())
+                }
+
+                else if (tempValueString.matches('.*([.,][789])')) {
+                    celsius = celsius.intValue() + 1
+                    tempValueString = String.format('%2d.0', celsius.intValue())
+                }
+                else {
+                    tempValueString = String.format('%2d.0', celsius.intValue())
+                }
+
+                return tempValueString.toDouble().round(1)
+            }
+            return celsius.round(1)
+        }
+        return Math.round(celsiusToFahrenheit(celsius))
+    }
+}
+
+private String hex(Double value) {
+    return new BigInteger(Math.round(value).toString()).toString(16)
+}
+
+private String getHeatingDemand(String value) {
+    if (value == null) {
+        return
+    }
+    Integer demand = Integer.parseInt(value, 16)
+    return demand.toString()
+}
+
+private Integer getActivePower(String value) {
+    if (value == null) {
+        return
+    }
+    Integer activePower = Integer.parseInt(value, 16)
+    return activePower
+}
+
+private Map getModeMap() {
+    return [
+        '00': 'off',
+        '04': 'heat'
+    ]
+}
+
+private Map getLockMap() {
+    return [
+        '00': 'unlocked ',
+        '01': 'locked ',
+    ]
+}
+
 private void sendCommands(List commands) {
     if (commands != null && commands.size() > 0) {
         if (settings.trace) {
@@ -558,8 +562,4 @@ private void sendCommands(List commands) {
             })
         }
     }
-}
-
-private String hex(Double value) {
-    return new BigInteger(Math.round(value).toString()).toString(16)
 }
