@@ -335,21 +335,22 @@ void refresh() {
         log.trace 'TH112XZB >> refresh()'
     }
 
-    if (!state.updatedLastRanAt || now() >= state.updatedLastRanAt + 5000) {
-        state.updatedLastRanAt = now()
+    if (state.updatedLastRanAt && now() < state.updatedLastRanAt + 5000) {
+        if (settings.trace) {
+            log.trace 'TH112XZB >> refresh() --- Ran within last 5 seconds so aborting'
+        }
+        return
+    }
+    state.updatedLastRanAt = now()
 
-        List cmds = []
-        cmds += zigbee.readAttribute(0x0201, 0x0000)  // Rd thermostat Local temperature
-        cmds += zigbee.readAttribute(0x0201, 0x0012)  // Rd thermostat Occupied heating setpoint
-        cmds += zigbee.readAttribute(0x0201, 0x0008)  // Rd thermostat PI heating demand
-        cmds += zigbee.readAttribute(0x0201, 0x001C)  // Rd thermostat System Mode
-        cmds += zigbee.readAttribute(0x0204, 0x0001)  // Rd thermostat Keypad lock
-        cmds += zigbee.readAttribute(0x0B04, 0x050B)  // Rd thermostat Active power
-        sendCommands(cmds)
-    }
-    if (settings.trace) {
-        log.trace 'TH112XZB >> refresh() --- Ran within last 5 seconds so aborting'
-    }
+    List cmds = []
+    cmds += zigbee.readAttribute(0x0201, 0x0000)  // Rd thermostat Local temperature
+    cmds += zigbee.readAttribute(0x0201, 0x0012)  // Rd thermostat Occupied heating setpoint
+    cmds += zigbee.readAttribute(0x0201, 0x0008)  // Rd thermostat PI heating demand
+    cmds += zigbee.readAttribute(0x0201, 0x001C)  // Rd thermostat System Mode
+    cmds += zigbee.readAttribute(0x0204, 0x0001)  // Rd thermostat Keypad lock
+    cmds += zigbee.readAttribute(0x0B04, 0x050B)  // Rd thermostat Active power
+    sendCommands(cmds)
 }
 
 void setOutdoorTemperature(Double outdoorTemp) {
