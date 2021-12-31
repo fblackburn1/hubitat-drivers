@@ -188,30 +188,63 @@ void uninstalled() {
     catch (ignored) { }
 }
 
-List parse(String description) {
-    List result = []
+Event parse(String description) {
+    // According hubitat doc, parseDescriptionAsMap only parse message starting with read attr and catchall
+    if (!description?.startsWith('read attr -') && !description?.startsWith('write attr -')) {
+        if (!description?.startsWith('catchall:')) {
+            log.trace 'TH112XZB >> parse(description) ==> ' + description
+        }
+        return
+    }
+
+    Event event
     String scale = getTemperatureScale()
+    Map descMap = zigbee.parseDescriptionAsMap(description)
     state?.scale = scale
 
-    if (description?.startsWith('read attr -') || description?.startsWith('write attr -')) {
-        Map descMap = zigbee.parseDescriptionAsMap(description)
-
-        result += convertCustomMap(descMap)
-
-        if (descMap.additionalAttrs) {
-            List mapAdditionnalAttrs = descMap.additionalAttrs
-
-            mapAdditionnalAttrs.each { add ->
-                add.cluster = descMap.cluster
-                result += convertCustomMap(add)
-            }
-        }
+    if (descMap.cluster == '0201' && descMap.attrId == '0000') {
+        event.name = 'temperature'
+        event.value = getTemperatureValue(descMap.value)
+        event.unit = scale
+        //allow 5 min without receiving temperature report
+        Map data = [protocol: 'zigbee', hubHardwareId: device.hub.hardwareID]
+        sendEvent(name: 'checkInterval', value: 300, displayed: false, data: data)
     }
-    else if (!description?.startsWith('catchall:')) {
-        log.trace 'TH112XZB >> parse(description) ==> ' + description
+    else if (descMap.cluster == '0201' && descMap.attrId == '0008') {
+        event.name = 'heatingDemand'
+        event.value = getHeatingDemand(descMap.value)
+        event.unit = '%'
+        String operatingState = (event.value.toInteger() < 10) ? 'idle' : 'heating'
+        sendEvent(name: 'thermostatOperatingState', value: operatingState)
+        runIn(1, requestPower)
     }
-
-    return result
+    else if (descMap.cluster == '0B04' && descMap.attrId == '050B') {
+        event.name = 'power'
+        event.value = getActivePower(descMap.value)
+        event.unit = 'W'
+    }
+    else if (descMap.cluster == '0201' && descMap.attrId == '0012') {
+        event.name = 'heatingSetpoint'
+        event.value = getTemperatureValue(descMap.value, true)
+        event.unit = scale
+    }
+    else if (descMap.cluster == '0201' && descMap.attrId == '0014') {
+        event.name = 'heatingSetpoint'
+        event.value = getTemperatureValue(descMap.value, true)
+        event.unit = scale
+    }
+    else if (descMap.cluster == '0201' && descMap.attrId == '001C') {
+        event.name = 'thermostatMode'
+        event.value = getModeMap()[descMap.value]
+    }
+    else if (descMap.cluster == '0204' && descMap.attrId == '0001') {
+        event.name = 'lock'
+        event.value = getLockMap()[descMap.value]
+    }
+    else {
+        log.trace 'TH112XZB >> parse(descMap) ==> ' + descMap
+    }
+    return event
 }
 
 Double getTemperatureValue(String value, Boolean doRounding = false) {
@@ -471,56 +504,6 @@ void requestPower() {
     List cmds = []
     cmds += zigbee.readAttribute(0x0B04, 0x050B)
     sendCommands(cmds)
-}
-
-private Map convertCustomMap(Map descMap) {
-    Map map = [:]
-    String scale = getTemperatureScale()
-
-    if (descMap.cluster == '0201' && descMap.attrId == '0000') {
-        map.name = 'temperature'
-        map.value = getTemperatureValue(descMap.value)
-        map.unit = scale
-        //allow 5 min without receiving temperature report
-        Map data = [protocol: 'zigbee', hubHardwareId: device.hub.hardwareID]
-        sendEvent(name: 'checkInterval', value: 300, displayed: false, data: data)
-    }
-    else if (descMap.cluster == '0201' && descMap.attrId == '0008') {
-        map.name = 'heatingDemand'
-        map.value = getHeatingDemand(descMap.value)
-        map.unit = '%'
-        String operatingState = (map.value.toInteger() < 10) ? 'idle' : 'heating'
-        sendEvent(name: 'thermostatOperatingState', value: operatingState)
-        runIn(1, requestPower)
-    }
-    else if (descMap.cluster == '0B04' && descMap.attrId == '050B') {
-        map.name = 'power'
-        map.value = getActivePower(descMap.value)
-        map.unit = 'W'
-    }
-    else if (descMap.cluster == '0201' && descMap.attrId == '0012') {
-        map.name = 'heatingSetpoint'
-        map.value = getTemperatureValue(descMap.value, true)
-        map.unit = scale
-    }
-    else if (descMap.cluster == '0201' && descMap.attrId == '0014') {
-        map.name = 'heatingSetpoint'
-        map.value = getTemperatureValue(descMap.value, true)
-        map.unit = scale
-    }
-    else if (descMap.cluster == '0201' && descMap.attrId == '001C') {
-        map.name = 'thermostatMode'
-        map.value = getModeMap()[descMap.value]
-    }
-    else if (descMap.cluster == '0204' && descMap.attrId == '0001') {
-        map.name = 'lock'
-        map.value = getLockMap()[descMap.value]
-    }
-    else {
-        log.trace 'TH112XZB >> convertCustomMap(descMap) ==> ' + descMap
-    }
-
-    return map
 }
 
 private void sendOutdoorTemperature(Double outdoorTemp) {
