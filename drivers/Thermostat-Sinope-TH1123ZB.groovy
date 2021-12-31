@@ -480,7 +480,7 @@ private Map convertCustomMap(Map descMap) {
     if (descMap.cluster == '0201' && descMap.attrId == '0000') {
         map.name = 'temperature'
         map.value = getTemperatureValue(descMap.value)
-        sendEvent(name: map.name, value: map.value, unit: scale)
+        map.unit = scale
         //allow 5 min without receiving temperature report
         Map data = [protocol: 'zigbee', hubHardwareId: device.hub.hardwareID]
         sendEvent(name: 'checkInterval', value: 300, displayed: false, data: data)
@@ -488,7 +488,7 @@ private Map convertCustomMap(Map descMap) {
     else if (descMap.cluster == '0201' && descMap.attrId == '0008') {
         map.name = 'heatingDemand'
         map.value = getHeatingDemand(descMap.value)
-        sendEvent(name: map.name, value: map.value, unit: '%')
+        map.unit = '%'
         String operatingState = (map.value.toInteger() < 10) ? 'idle' : 'heating'
         sendEvent(name: 'thermostatOperatingState', value: operatingState)
         runIn(1, requestPower)
@@ -496,27 +496,25 @@ private Map convertCustomMap(Map descMap) {
     else if (descMap.cluster == '0B04' && descMap.attrId == '050B') {
         map.name = 'power'
         map.value = getActivePower(descMap.value)
-        sendEvent(name: map.name, value: map.value, unit: 'W')
+        map.unit = 'W'
     }
     else if (descMap.cluster == '0201' && descMap.attrId == '0012') {
         map.name = 'heatingSetpoint'
         map.value = getTemperatureValue(descMap.value, true)
-        sendEvent(name: map.name, value: map.value, unit: scale)
+        map.unit = scale
     }
     else if (descMap.cluster == '0201' && descMap.attrId == '0014') {
         map.name = 'heatingSetpoint'
         map.value = getTemperatureValue(descMap.value, true)
-        sendEvent(name: map.name, value: map.value, unit: scale)
+        map.unit = scale
     }
     else if (descMap.cluster == '0201' && descMap.attrId == '001C') {
         map.name = 'thermostatMode'
         map.value = getModeMap()[descMap.value]
-        sendEvent(name: map.name, value: map.value)
     }
     else if (descMap.cluster == '0204' && descMap.attrId == '0001') {
         map.name = 'lock'
         map.value = getLockMap()[descMap.value]
-        sendEvent(name: map.name, value: map.value)
     }
     else {
         log.trace 'TH112XZB >> convertCustomMap(descMap) ==> ' + descMap
