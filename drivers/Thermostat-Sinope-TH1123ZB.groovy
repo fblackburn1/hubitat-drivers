@@ -189,8 +189,7 @@ void uninstalled() {
 }
 
 Event parse(String description) {
-    // According hubitat doc, parseDescriptionAsMap only parse message starting with read attr and catchall
-    if (!description?.startsWith('read attr -') && !description?.startsWith('write attr -')) {
+    if (!description?.startsWith('read attr -')) {
         if (!description?.startsWith('catchall:')) {
             log.trace 'TH112XZB >> parse(description) ==> ' + description
         }
