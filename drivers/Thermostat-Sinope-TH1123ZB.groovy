@@ -16,8 +16,8 @@
  *
  *  0.4   (2021-12-12) => Added changes from SmartThings driver v1.2.0
  *  0.5   (2021-12-15) => Added possibility to set outdoor temperature from command and fixed power reporting event
+ *  0.6   (2022-01-01) => Fix duplicate events and add event descriptionText attribute
  *  Author(0.4+): fblackburn
- *  Date: 2021-12-12
  */
 
 // Sources:
@@ -188,98 +188,78 @@ void uninstalled() {
     catch (ignored) { }
 }
 
-List parse(String description) {
-    List result = []
+Map parse(String description) {
+    if (!description?.startsWith('read attr -')) {
+        if (!description?.startsWith('catchall:')) {
+            log.trace 'TH112XZB >> parse(description) ==> ' + description
+        }
+        return [:]
+    }
+
+    Map event = [:]
     String scale = getTemperatureScale()
+    Map descMap = zigbee.parseDescriptionAsMap(description)
     state?.scale = scale
 
-    if (description?.startsWith('read attr -') || description?.startsWith('write attr -')) {
-        Map descMap = zigbee.parseDescriptionAsMap(description)
-
-        result += convertCustomMap(descMap)
-
-        if (descMap.additionalAttrs) {
-            List mapAdditionnalAttrs = descMap.additionalAttrs
-
-            mapAdditionnalAttrs.each { add ->
-                add.cluster = descMap.cluster
-                result += convertCustomMap(add)
-            }
-        }
+    if (descMap.cluster == '0201' && descMap.attrId == '0000') {
+        event.name = 'temperature'
+        event.value = getTemperatureValue(descMap.value)
+        event.unit = '°' + scale
+        //allow 5 min without receiving temperature report
+        Map data = [protocol: 'zigbee', hubHardwareId: device.getHub().hardwareID]
+        sendEvent(name: 'checkInterval', value: 300, displayed: false, data: data)
     }
-    else if (!description?.startsWith('catchall:')) {
-        log.trace 'TH112XZB >> parse(description) ==> ' + description
+    else if (descMap.cluster == '0201' && descMap.attrId == '0008') {
+        event.name = 'heatingDemand'
+        event.value = getHeatingDemand(descMap.value)
+        event.unit = '%'
+        String operatingState = (event.value.toInteger() < 10) ? 'idle' : 'heating'
+        Map subEvent = ['name': 'thermostatOperatingState', 'value': operatingState]
+        subEvent.descriptionText = device.getLabel() + ' ' + subEvent.name + ' is ' + subEvent.value
+        sendEvent(subEvent)
+        runIn(1, requestPower)
+    }
+    else if (descMap.cluster == '0B04' && descMap.attrId == '050B') {
+        event.name = 'power'
+        event.value = getActivePower(descMap.value)
+        event.unit = 'W'
+    }
+    else if (descMap.cluster == '0201' && descMap.attrId == '0012') {
+        event.name = 'heatingSetpoint'
+        event.value = getTemperatureValue(descMap.value, true)
+        event.unit = '°' + scale
+    }
+    else if (descMap.cluster == '0201' && descMap.attrId == '0014') {
+        event.name = 'heatingSetpoint'
+        event.value = getTemperatureValue(descMap.value, true)
+        event.unit = '°' + scale
+    }
+    else if (descMap.cluster == '0201' && descMap.attrId == '001C') {
+        event.name = 'thermostatMode'
+        event.value = getModeMap()[descMap.value]
+    }
+    else if (descMap.cluster == '0204' && descMap.attrId == '0001') {
+        event.name = 'lock'
+        event.value = getLockMap()[descMap.value]
+    }
+    else {
+        log.trace 'TH112XZB >> parse(descMap) ==> ' + descMap
     }
 
-    return result
-}
-
-Double getTemperatureValue(String value, Boolean doRounding = false) {
-    String scale = state?.scale
-
-    if (value != null) {
-        Double celsius = (Integer.parseInt(value, 16) / 100).toDouble()
-
-        if (scale == 'C') {
-            if (doRounding) {
-                String tempValueString = String.format('%2.1f', celsius)
-
-                if (tempValueString.matches('.*([.,][456])')) {
-                    tempValueString = String.format('%2d.5', celsius.intValue())
-                }
-
-                else if (tempValueString.matches('.*([.,][789])')) {
-                    celsius = celsius.intValue() + 1
-                    tempValueString = String.format('%2d.0', celsius.intValue())
-                }
-                else {
-                    tempValueString = String.format('%2d.0', celsius.intValue())
-                }
-
-                return tempValueString.toDouble().round(1)
-            }
-            return celsius.round(1)
-        }
-        return Math.round(celsiusToFahrenheit(celsius))
+    event.descriptionText = device.getLabel() + ' ' + event.name + ' is ' + event.value
+    if (event.unit) {
+        event.descriptionText = event.descriptionText + event.unit
     }
-}
-
-String getHeatingDemand(String value) {
-    if (value == null) {
-        return
-    }
-    Integer demand = Integer.parseInt(value, 16)
-    return demand.toString()
-}
-
-Integer getActivePower(String value) {
-    if (value == null) {
-        return
-    }
-    Integer activePower = Integer.parseInt(value, 16)
-    return activePower
-}
-
-Map getModeMap() {
-    return [
-        '00': 'off',
-        '04': 'heat'
-    ]
-}
-
-Map getLockMap() {
-    return [
-        '00': 'unlocked ',
-        '01': 'locked ',
-    ]
+    return event
 }
 
 void unlock() {
     if (settings.trace) {
         log.trace 'TH112XZB >> unlock()'
     }
-
-    sendEvent(name: 'lock', value: 'unlocked')
+    Map event = ['name': 'lock', 'value': 'unlocked']
+    event.descriptionText = device.getLabel() + ' ' + event.name + ' is ' + event.value
+    sendEvent(event)
 
     List cmds = []
     cmds += zigbee.writeAttribute(0x0204, 0x0001, DataType.ENUM8, 0x00)
@@ -290,8 +270,9 @@ void lock() {
     if (settings.trace) {
         log.trace 'TH112XZB >> lock()'
     }
-
-    sendEvent(name: 'lock', value: 'locked')
+    Map event = ['name': 'lock', 'value': 'locked']
+    event.descriptionText = device.getLabel() + ' ' + event.name + ' is ' + event.value
+    sendEvent(event)
 
     List cmds = []
     cmds += zigbee.writeAttribute(0x0204, 0x0001, DataType.ENUM8, 0x01)
@@ -303,21 +284,22 @@ void refresh() {
         log.trace 'TH112XZB >> refresh()'
     }
 
-    if (!state.updatedLastRanAt || now() >= state.updatedLastRanAt + 5000) {
-        state.updatedLastRanAt = now()
+    if (state.updatedLastRanAt && now() < state.updatedLastRanAt + 5000) {
+        if (settings.trace) {
+            log.trace 'TH112XZB >> refresh() --- Ran within last 5 seconds so aborting'
+        }
+        return
+    }
+    state.updatedLastRanAt = now()
 
-        List cmds = []
-        cmds += zigbee.readAttribute(0x0201, 0x0000)  // Rd thermostat Local temperature
-        cmds += zigbee.readAttribute(0x0201, 0x0012)  // Rd thermostat Occupied heating setpoint
-        cmds += zigbee.readAttribute(0x0201, 0x0008)  // Rd thermostat PI heating demand
-        cmds += zigbee.readAttribute(0x0201, 0x001C)  // Rd thermostat System Mode
-        cmds += zigbee.readAttribute(0x0204, 0x0001)  // Rd thermostat Keypad lock
-        cmds += zigbee.readAttribute(0x0B04, 0x050B)  // Rd thermostat Active power
-        sendCommands(cmds)
-    }
-    if (settings.trace) {
-        log.trace 'TH112XZB >> refresh() --- Ran within last 5 seconds so aborting'
-    }
+    List cmds = []
+    cmds += zigbee.readAttribute(0x0201, 0x0000)  // Rd thermostat Local temperature
+    cmds += zigbee.readAttribute(0x0201, 0x0012)  // Rd thermostat Occupied heating setpoint
+    cmds += zigbee.readAttribute(0x0201, 0x0008)  // Rd thermostat PI heating demand
+    cmds += zigbee.readAttribute(0x0201, 0x001C)  // Rd thermostat System Mode
+    cmds += zigbee.readAttribute(0x0204, 0x0001)  // Rd thermostat Keypad lock
+    cmds += zigbee.readAttribute(0x0B04, 0x050B)  // Rd thermostat Active power
+    sendCommands(cmds)
 }
 
 void setOutdoorTemperature(Double outdoorTemp) {
@@ -392,8 +374,9 @@ void setHeatingSetpoint(Double degrees) {
     else {
         tempValueString = String.format('%2d', degreesDouble.intValue())
     }
-
-    sendEvent(name: 'heatingSetpoint', value: tempValueString, unit: scale)
+    Map event = ['name': 'heatingSetpoint', 'value': tempValueString, 'unit': '°' + scale]
+    event.descriptionText = device.getLabel() + ' ' + event.name + ' is ' + event.value + event.unit
+    sendEvent(event)
 
     Double celsius = (scale == 'C') ? degreesDouble : (fahrenheitToCelsius(degreesDouble) as Double).round(1)
 
@@ -473,58 +456,6 @@ void requestPower() {
     sendCommands(cmds)
 }
 
-private Map convertCustomMap(Map descMap) {
-    Map map = [:]
-    String scale = getTemperatureScale()
-
-    if (descMap.cluster == '0201' && descMap.attrId == '0000') {
-        map.name = 'temperature'
-        map.value = getTemperatureValue(descMap.value)
-        sendEvent(name: map.name, value: map.value, unit: scale)
-        //allow 5 min without receiving temperature report
-        Map data = [protocol: 'zigbee', hubHardwareId: device.hub.hardwareID]
-        sendEvent(name: 'checkInterval', value: 300, displayed: false, data: data)
-    }
-    else if (descMap.cluster == '0201' && descMap.attrId == '0008') {
-        map.name = 'heatingDemand'
-        map.value = getHeatingDemand(descMap.value)
-        sendEvent(name: map.name, value: map.value, unit: '%')
-        String operatingState = (map.value.toInteger() < 10) ? 'idle' : 'heating'
-        sendEvent(name: 'thermostatOperatingState', value: operatingState)
-        runIn(1, requestPower)
-    }
-    else if (descMap.cluster == '0B04' && descMap.attrId == '050B') {
-        map.name = 'power'
-        map.value = getActivePower(descMap.value)
-        sendEvent(name: map.name, value: map.value, unit: 'W')
-    }
-    else if (descMap.cluster == '0201' && descMap.attrId == '0012') {
-        map.name = 'heatingSetpoint'
-        map.value = getTemperatureValue(descMap.value, true)
-        sendEvent(name: map.name, value: map.value, unit: scale)
-    }
-    else if (descMap.cluster == '0201' && descMap.attrId == '0014') {
-        map.name = 'heatingSetpoint'
-        map.value = getTemperatureValue(descMap.value, true)
-        sendEvent(name: map.name, value: map.value, unit: scale)
-    }
-    else if (descMap.cluster == '0201' && descMap.attrId == '001C') {
-        map.name = 'thermostatMode'
-        map.value = getModeMap()[descMap.value]
-        sendEvent(name: map.name, value: map.value)
-    }
-    else if (descMap.cluster == '0204' && descMap.attrId == '0001') {
-        map.name = 'lock'
-        map.value = getLockMap()[descMap.value]
-        sendEvent(name: map.name, value: map.value)
-    }
-    else {
-        log.trace 'TH112XZB >> convertCustomMap(descMap) ==> ' + descMap
-    }
-
-    return map
-}
-
 private void sendOutdoorTemperature(Double outdoorTemp) {
     List cmds = []
     Integer timeout = 3 * 60 * 60 // 3 hours
@@ -565,6 +496,70 @@ private Double checkTemperature(Double temperature) {
     return number
 }
 
+private Double getTemperatureValue(String value, Boolean doRounding = false) {
+    String scale = state?.scale
+
+    if (value != null) {
+        Double celsius = (Integer.parseInt(value, 16) / 100).toDouble()
+
+        if (scale == 'C') {
+            if (doRounding) {
+                String tempValueString = String.format('%2.1f', celsius)
+
+                if (tempValueString.matches('.*([.,][456])')) {
+                    tempValueString = String.format('%2d.5', celsius.intValue())
+                }
+
+                else if (tempValueString.matches('.*([.,][789])')) {
+                    celsius = celsius.intValue() + 1
+                    tempValueString = String.format('%2d.0', celsius.intValue())
+                }
+                else {
+                    tempValueString = String.format('%2d.0', celsius.intValue())
+                }
+
+                return tempValueString.toDouble().round(1)
+            }
+            return celsius.round(1)
+        }
+        return Math.round(celsiusToFahrenheit(celsius))
+    }
+}
+
+private String hex(Double value) {
+    return new BigInteger(Math.round(value).toString()).toString(16)
+}
+
+private String getHeatingDemand(String value) {
+    if (value == null) {
+        return
+    }
+    Integer demand = Integer.parseInt(value, 16)
+    return demand.toString()
+}
+
+private Integer getActivePower(String value) {
+    if (value == null) {
+        return
+    }
+    Integer activePower = Integer.parseInt(value, 16)
+    return activePower
+}
+
+private Map getModeMap() {
+    return [
+        '00': 'off',
+        '04': 'heat'
+    ]
+}
+
+private Map getLockMap() {
+    return [
+        '00': 'unlocked ',
+        '01': 'locked ',
+    ]
+}
+
 private void sendCommands(List commands) {
     if (commands != null && commands.size() > 0) {
         if (settings.trace) {
@@ -577,8 +572,4 @@ private void sendCommands(List commands) {
             })
         }
     }
-}
-
-private String hex(Double value) {
-    return new BigInteger(Math.round(value).toString()).toString(16)
 }
