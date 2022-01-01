@@ -16,8 +16,8 @@
  *
  *  0.4   (2021-12-12) => Added changes from SmartThings driver v1.2.0
  *  0.5   (2021-12-15) => Added possibility to set outdoor temperature from command and fixed power reporting event
+ *  0.6   (2022-01-01) => Fix duplicate events and add event descriptionText attribute
  *  Author(0.4+): fblackburn
- *  Date: 2021-12-12
  */
 
 // Sources:
