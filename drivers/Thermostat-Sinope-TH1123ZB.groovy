@@ -16,7 +16,8 @@
  *
  *  0.4   (2021-12-12) => Added changes from SmartThings driver v1.2.0
  *  0.5   (2021-12-15) => Added possibility to set outdoor temperature from command and fixed power reporting event
- *  0.6   (2022-01-01) => Fix duplicate events and add event descriptionText attribute
+ *  0.6   (2022-01-01) => Fixed duplicate events and added event descriptionText attribute
+ *  0.7   (2022-01-09) => Added setClockTime command and updated time on "configure" command
  *  Author(0.4+): fblackburn
  */
 
@@ -164,6 +165,8 @@ void configure() {
         displayed: false,
         data: [protocol: 'zigbee', hubHardwareId: device.hub.hardwareID],
     )
+
+    refresh_misc()
 }
 
 void initialize() {
