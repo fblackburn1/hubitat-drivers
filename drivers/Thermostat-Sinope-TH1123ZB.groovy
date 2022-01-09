@@ -95,6 +95,8 @@ metadata
                 constraints: ['Outdoor', 'Setpoint'],
             ]]
         )
+        command('setClockTime')
+
         command 'emergencyHeat', [[name: 'Not Supported']]
         command 'auto', [[name: 'Not Supported']]
         command 'cool', [[name: 'Not Supported']]
@@ -323,18 +325,9 @@ void displayTemperature(String choice) {
     state.displayTemperature = choice
 }
 
-void refresh_misc() {
+void setClockTime() {
     List cmds = []
-
-    // Backlight
-    if (backlightAutoDimParam == 'On Demand') {
-        cmds += zigbee.writeAttribute(0x0201, 0x0402, DataType.ENUM8, 0x0000)
-    }
-    else {
-        cmds += zigbee.writeAttribute(0x0201, 0x0402, DataType.ENUM8, 0x0001)
-    }
-
-    // TimeFormat
+    // Time Format
     if (timeFormatParam == '12 Hour') {
         // 12 Hour
         cmds += zigbee.writeAttribute(0xFF01, 0x0114, 0x30, 0x0001)
@@ -354,6 +347,20 @@ void refresh_misc() {
     Integer currentTimeToSend = zigbee.convertHexToInt(hex(currentTimeToDisplay))
     cmds += zigbee.writeAttribute(0xFF01, 0x0020, DataType.UINT32, currentTimeToSend, [mfgCode: '0x119C'])
 
+    sendCommands(cmds)
+}
+
+void refresh_misc() {
+    List cmds = []
+
+    // Backlight
+    if (backlightAutoDimParam == 'On Demand') {
+        cmds += zigbee.writeAttribute(0x0201, 0x0402, DataType.ENUM8, 0x0000)
+    }
+    else {
+        cmds += zigbee.writeAttribute(0x0201, 0x0402, DataType.ENUM8, 0x0001)
+    }
+
     // °C or °F
     if (state?.scale == 'C') {
         cmds += zigbee.writeAttribute(0x0204, 0x0000, DataType.ENUM8, 0)  // °C on thermostat display
@@ -363,6 +370,7 @@ void refresh_misc() {
     }
 
     sendCommands(cmds)
+    setClockTime()
 }
 
 void setHeatingSetpoint(Double degrees) {
