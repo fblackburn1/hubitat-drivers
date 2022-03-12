@@ -96,6 +96,8 @@ metadata
             ]]
         )
         command('setClockTime')
+        command('enableBacklight')
+        command('disableBacklight')
 
         command 'emergencyHeat', [[name: 'Not Supported']]
         command 'auto', [[name: 'Not Supported']]
@@ -325,6 +327,18 @@ void displayTemperature(String choice) {
     state.displayTemperature = choice
 }
 
+void enableBacklight() {
+    List cmds = []
+    cmds += zigbee.writeAttribute(0x0201, 0x0402, DataType.ENUM8, 0x0001)
+    sendCommands(cmds)
+}
+
+void disableBacklight() {
+    List cmds = []
+    cmds += zigbee.writeAttribute(0x0201, 0x0402, DataType.ENUM8, 0x0000)
+    sendCommands(cmds)
+}
+
 void setClockTime() {
     List cmds = []
     // Time Format
@@ -353,14 +367,6 @@ void setClockTime() {
 void refresh_misc() {
     List cmds = []
 
-    // Backlight
-    if (backlightAutoDimParam == 'On Demand') {
-        cmds += zigbee.writeAttribute(0x0201, 0x0402, DataType.ENUM8, 0x0000)
-    }
-    else {
-        cmds += zigbee.writeAttribute(0x0201, 0x0402, DataType.ENUM8, 0x0001)
-    }
-
     // °C or °F
     if (state?.scale == 'C') {
         cmds += zigbee.writeAttribute(0x0204, 0x0000, DataType.ENUM8, 0)  // °C on thermostat display
@@ -371,6 +377,14 @@ void refresh_misc() {
 
     sendCommands(cmds)
     setClockTime()
+
+    // Backlight
+    if (settings.backlightAutoDimParam == 'On Demand') {
+        disableBacklight()
+    }
+    else {
+        enableBacklight()
+    }
 }
 
 void setHeatingSetpoint(Double degrees) {
