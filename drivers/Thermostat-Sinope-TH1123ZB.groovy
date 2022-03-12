@@ -18,6 +18,7 @@
  *  0.5   (2021-12-15) => Added possibility to set outdoor temperature from command and fixed power reporting event
  *  0.6   (2022-01-01) => Fixed duplicate events and added event descriptionText attribute
  *  0.7   (2022-01-09) => Added setClockTime command and updated time on "configure" command
+ *  0.8   (2022-03-12) => Added enableBacklight and disableBacklight commands
  *  Author(0.4+): fblackburn
  */
 
