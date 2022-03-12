@@ -18,6 +18,7 @@
  *  0.5   (2021-12-15) => Added possibility to set outdoor temperature from command and fixed power reporting event
  *  0.6   (2022-01-01) => Fixed duplicate events and added event descriptionText attribute
  *  0.7   (2022-01-09) => Added setClockTime command and updated time on "configure" command
+ *  0.8   (2022-03-12) => Added enableBacklight and disableBacklight commands
  *  Author(0.4+): fblackburn
  */
 
@@ -96,6 +97,8 @@ metadata
             ]]
         )
         command('setClockTime')
+        command('enableBacklight')
+        command('disableBacklight')
 
         command 'emergencyHeat', [[name: 'Not Supported']]
         command 'auto', [[name: 'Not Supported']]
@@ -325,10 +328,22 @@ void displayTemperature(String choice) {
     state.displayTemperature = choice
 }
 
+void enableBacklight() {
+    List cmds = []
+    cmds += zigbee.writeAttribute(0x0201, 0x0402, DataType.ENUM8, 0x0001)
+    sendCommands(cmds)
+}
+
+void disableBacklight() {
+    List cmds = []
+    cmds += zigbee.writeAttribute(0x0201, 0x0402, DataType.ENUM8, 0x0000)
+    sendCommands(cmds)
+}
+
 void setClockTime() {
     List cmds = []
     // Time Format
-    if (timeFormatParam == '12 Hour') {
+    if (settings.timeFormatParam == '12 Hour') {
         // 12 Hour
         cmds += zigbee.writeAttribute(0xFF01, 0x0114, 0x30, 0x0001)
     }
@@ -353,14 +368,6 @@ void setClockTime() {
 void refresh_misc() {
     List cmds = []
 
-    // Backlight
-    if (backlightAutoDimParam == 'On Demand') {
-        cmds += zigbee.writeAttribute(0x0201, 0x0402, DataType.ENUM8, 0x0000)
-    }
-    else {
-        cmds += zigbee.writeAttribute(0x0201, 0x0402, DataType.ENUM8, 0x0001)
-    }
-
     // °C or °F
     if (state?.scale == 'C') {
         cmds += zigbee.writeAttribute(0x0204, 0x0000, DataType.ENUM8, 0)  // °C on thermostat display
@@ -371,6 +378,14 @@ void refresh_misc() {
 
     sendCommands(cmds)
     setClockTime()
+
+    // Backlight
+    if (settings.backlightAutoDimParam == 'On Demand') {
+        disableBacklight()
+    }
+    else {
+        enableBacklight()
+    }
 }
 
 void setHeatingSetpoint(Double degrees) {
