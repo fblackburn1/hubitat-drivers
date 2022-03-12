@@ -328,7 +328,7 @@ void displayTemperature(String choice) {
 void setClockTime() {
     List cmds = []
     // Time Format
-    if (timeFormatParam == '12 Hour') {
+    if (settings.timeFormatParam == '12 Hour') {
         // 12 Hour
         cmds += zigbee.writeAttribute(0xFF01, 0x0114, 0x30, 0x0001)
     }
