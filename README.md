@@ -11,3 +11,4 @@ Official driver doesn't support the following features:
 * Fetching power consumption
 * Displaying Outdoor temperature
 * Activating Lock/Unlock
+* Controlling display light with command
