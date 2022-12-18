@@ -67,7 +67,6 @@ metadata
         capability 'ThermostatHeatingSetpoint'
         capability 'ThermostatMode'
         capability 'Lock'
-        capability 'HealthCheck'
         capability 'PowerMeter'
 
         command(
@@ -162,15 +161,6 @@ void configure() {
     cmds += zigbee.configureReporting(0x0B04, 0x050B, DataType.INT16, 30, 599, 0x64)    // active power
 
     sendCommands(cmds)
-
-    // Allow 5 min without receiving temperature report
-    sendEvent(
-        name: 'checkInterval',
-        value: 300,
-        displayed: false,
-        data: [protocol: 'zigbee', hubHardwareId: device.hub.hardwareID],
-    )
-
     refresh_misc()
 }
 
@@ -181,12 +171,6 @@ void initialize() {
 
     refresh_misc()
     refresh()
-}
-
-void ping() {
-    List cmds = []
-    cmds += zigbee.readAttribute(0x0201, 0x0000) // temperature
-    sendCommands(cmds)
 }
 
 void uninstalled() {
@@ -213,9 +197,6 @@ Map parse(String description) {
         event.name = 'temperature'
         event.value = getTemperatureValue(descMap.value)
         event.unit = '°' + scale
-        //allow 5 min without receiving temperature report
-        Map data = [protocol: 'zigbee', hubHardwareId: device.getHub().hardwareID]
-        sendEvent(name: 'checkInterval', value: 300, displayed: false, data: data)
     }
     else if (descMap.cluster == '0201' && descMap.attrId == '0008') {
         event.name = 'heatingDemand'
