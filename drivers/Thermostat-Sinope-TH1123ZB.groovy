@@ -379,23 +379,11 @@ void setHeatingSetpoint(Double degrees) {
     }
     String scale = getTemperatureScale()
     Double degreesScoped = checkTemperature(degrees)
-    Double degreesDouble = degreesScoped as Double
-    String tempValueString
-
-    if (scale == 'C') {
-        tempValueString = String.format('%2.1f', degreesDouble)
-    }
-    else {
-        tempValueString = String.format('%2d', degreesDouble.intValue())
-    }
-    Map event = ['name': 'heatingSetpoint', 'value': tempValueString, 'unit': '°' + scale]
-    event.descriptionText = device.getLabel() + ' ' + event.name + ' is ' + event.value + event.unit
-    sendEvent(event)
-
-    Double celsius = (scale == 'C') ? degreesDouble : (fahrenheitToCelsius(degreesDouble) as Double).round(1)
+    Double celsius = (scale == 'C') ? degreesScoped : fahrenheitToCelsius(degreesScoped).round(1)
+    Integer celsiusRound = Math.round(celsius * 100)
 
     List cmds = []
-    cmds += zigbee.writeAttribute(0x0201, 0x0012, DataType.INT16,  zigbee.convertHexToInt(hex(celsius * 100)))
+    cmds += zigbee.writeAttribute(0x0201, 0x0012, DataType.INT16, celsiusRound)
     cmds += zigbee.readAttribute(0x0201, 0x0012)
     sendCommands(cmds)
 }
