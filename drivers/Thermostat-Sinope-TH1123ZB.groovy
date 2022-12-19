@@ -187,14 +187,14 @@ Map parse(String description) {
     if (descMap.cluster == '0201' && descMap.attrId == '0000') {
         event.name = 'temperature'
         event.value = getTemperatureValue(descMap.value)
-        event.unit = '°' + scale
+        event.unit = "°${scale}"
     } else if (descMap.cluster == '0201' && descMap.attrId == '0008') {
         event.name = 'heatingDemand'
         event.value = getHeatingDemand(descMap.value)
         event.unit = '%'
         String operatingState = (event.value.toInteger() < 10) ? 'idle' : 'heating'
         Map subEvent = ['name': 'thermostatOperatingState', 'value': operatingState]
-        subEvent.descriptionText = device.getLabel() + ' ' + subEvent.name + ' is ' + subEvent.value
+        subEvent.descriptionText = "${device.getLabel()} ${subEvent.name} is ${subEvent.value}"
         sendEvent(subEvent)
         runIn(1, requestPower)
     } else if (descMap.cluster == '0B04' && descMap.attrId == '050B') {
@@ -204,11 +204,11 @@ Map parse(String description) {
     } else if (descMap.cluster == '0201' && descMap.attrId == '0012') {
         event.name = 'heatingSetpoint'
         event.value = getTemperatureValue(descMap.value, true)
-        event.unit = '°' + scale
+        event.unit = "°${scale}"
     } else if (descMap.cluster == '0201' && descMap.attrId == '0014') {
         event.name = 'heatingSetpoint'
         event.value = getTemperatureValue(descMap.value, true)
-        event.unit = '°' + scale
+        event.unit = "°${scale}"
     } else if (descMap.cluster == '0201' && descMap.attrId == '001C') {
         event.name = 'thermostatMode'
         event.value = getModeMap()[descMap.value]
@@ -218,14 +218,16 @@ Map parse(String description) {
     } else {
         log.warn "TH112XZB >> parse(descMap) ==> Unhandled attribute: ${descMap}"
     }
+
+    if (event.name && event.value) {
+        event.descriptionText = "${device.getLabel()} ${event.name} is ${event.value}"
+        if (event.unit) {
+            event.descriptionText = "${event.descriptionText}${event.unit}"
+        }
     }
 
     if (settings.trace) {
         log.trace "TH112XZB >> parse(description) ==> ${event.name}: ${event.value}"
-    }
-    event.descriptionText = device.getLabel() + ' ' + event.name + ' is ' + event.value
-    if (event.unit) {
-        event.descriptionText = event.descriptionText + event.unit
     }
     return event
 }
@@ -235,7 +237,7 @@ void unlock() {
         log.trace 'TH112XZB >> unlock()'
     }
     Map event = ['name': 'lock', 'value': 'unlocked']
-    event.descriptionText = device.getLabel() + ' ' + event.name + ' is ' + event.value
+    event.descriptionText = "${device.getLabel()} ${event.name} is ${event.value}"
     sendEvent(event)
 
     List cmds = []
@@ -248,7 +250,7 @@ void lock() {
         log.trace 'TH112XZB >> lock()'
     }
     Map event = ['name': 'lock', 'value': 'locked']
-    event.descriptionText = device.getLabel() + ' ' + event.name + ' is ' + event.value
+    event.descriptionText = "${device.getLabel()} ${event.name} is ${event.value}"
     sendEvent(event)
 
     List cmds = []
