@@ -134,11 +134,6 @@ void updated() {
 
     if (!state.updatedLastRanAt || now() >= state.updatedLastRanAt + 1000) {
         state.updatedLastRanAt = now()
-
-        if (settings.trace) {
-            log.trace 'TH112XZB >> updated() => Device is now updated'
-        }
-
         try {
             unschedule()
         }
@@ -153,7 +148,7 @@ void configure() {
         log.trace 'TH112XZB >> configure()'
     }
 
-    // Configure reporting ...
+    // Configure reporting
     List cmds = []
     cmds += zigbee.configureReporting(0x0201, 0x0000, DataType.INT16, 19, 301, 50)      // local temperature
     cmds += zigbee.configureReporting(0x0201, 0x0008, DataType.UINT8, 4, 300, 10)       // heating demand
@@ -166,6 +161,9 @@ void configure() {
 }
 
 void uninstalled() {
+    if (settings.trace) {
+        log.trace 'TH112XZB >> uninstalled()'
+    }
     try {
         unschedule()
     }
@@ -175,7 +173,7 @@ void uninstalled() {
 Map parse(String description) {
     if (!description?.startsWith('read attr -')) {
         if (!description?.startsWith('catchall:')) {
-            log.trace 'TH112XZB >> parse(description) ==> ' + description
+            log.warn "SP2600ZB >> parse(description) ==> Unhandled event: ${description}"
         }
         return [:]
     }
@@ -222,11 +220,16 @@ Map parse(String description) {
     else if (descMap.cluster == '0204' && descMap.attrId == '0001') {
         event.name = 'lock'
         event.value = getLockMap()[descMap.value]
+    } else {
+        log.warn "TH112XZB >> parse(descMap) ==> Unhandled attribute: ${descMap}"
     }
     else {
         log.trace 'TH112XZB >> parse(descMap) ==> ' + descMap
     }
 
+    if (settings.trace) {
+        log.trace "TH112XZB >> parse(description) ==> ${event.name}: ${event.value}"
+    }
     event.descriptionText = device.getLabel() + ' ' + event.name + ' is ' + event.value
     if (event.unit) {
         event.descriptionText = event.descriptionText + event.unit
@@ -284,6 +287,9 @@ void refresh() {
 }
 
 void setOutdoorTemperature(Double outdoorTemp) {
+    if (settings.trace) {
+        log.trace "TH112XZB >> setOutdoorTemperature(${outdoorTemp})"
+    }
     state.outdoorTemperature = outdoorTemp
     if (state.displayTemperature == 'Setpoint') {
         return
@@ -292,6 +298,9 @@ void setOutdoorTemperature(Double outdoorTemp) {
 }
 
 void displayTemperature(String choice) {
+    if (settings.trace) {
+        log.trace "TH112XZB >> displayTemperature(${choice})"
+    }
     if (state.outdoorTemperature && choice == 'Outdoor') {
         sendOutdoorTemperature(state.outdoorTemperature)
     }
@@ -302,18 +311,27 @@ void displayTemperature(String choice) {
 }
 
 void enableBacklight() {
+    if (settings.trace) {
+        log.trace 'TH112XZB >> enableBacklight()'
+    }
     List cmds = []
     cmds += zigbee.writeAttribute(0x0201, 0x0402, DataType.ENUM8, 0x0001)
     sendCommands(cmds)
 }
 
 void disableBacklight() {
+    if (settings.trace) {
+        log.trace 'TH112XZB >> disableBacklight()'
+    }
     List cmds = []
     cmds += zigbee.writeAttribute(0x0201, 0x0402, DataType.ENUM8, 0x0000)
     sendCommands(cmds)
 }
 
 void setClockTime() {
+    if (settings.trace) {
+        log.trace 'TH112XZB >> setClockTime()'
+    }
     List cmds = []
     // Time Format
     if (settings.timeFormatParam == '12 Hour') {
@@ -362,6 +380,9 @@ void refresh_misc() {
 }
 
 void setHeatingSetpoint(Double degrees) {
+    if (settings.trace) {
+        log.trace "TH112XZB >> setHeatingSetpoint(${degrees})"
+    }
     String scale = getTemperatureScale()
     Double degreesScoped = checkTemperature(degrees)
     Double degreesDouble = degreesScoped as Double
@@ -386,10 +407,16 @@ void setHeatingSetpoint(Double degrees) {
 }
 
 void off() {
+    if (settings.trace) {
+        log.trace 'TH112XZB >> off()'
+    }
     setThermostatMode('off')
 }
 
 void heat() {
+    if (settings.trace) {
+        log.trace 'TH112XZB >> heat()'
+    }
     setThermostatMode('heat')
 }
 
