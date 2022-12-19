@@ -123,8 +123,8 @@ void installed() {
     if (settings.trace) {
         log.trace 'TH112XZB >> installed()'
     }
-
-    initialize()
+    refresh_misc()
+    refresh()
 }
 
 void updated() {
@@ -163,15 +163,6 @@ void configure() {
 
     sendCommands(cmds)
     refresh_misc()
-}
-
-void initialize() {
-    if (settings.trace) {
-        log.trace 'TH112XZB >> initialize()'
-    }
-
-    refresh_misc()
-    refresh()
 }
 
 void uninstalled() {
