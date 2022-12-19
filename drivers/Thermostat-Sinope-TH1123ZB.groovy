@@ -337,35 +337,11 @@ void setClockTime() {
     Date thermostatDate = new Date()
     Integer thermostatTimeSec = thermostatDate.getTime() / 1000
     Integer thermostatTimezoneOffsetSec = thermostatDate.getTimezoneOffset() * 60
-    Integer currentTimeToDisplay = Math.round(thermostatTimeSec - thermostatTimezoneOffsetSec - 946684800)
+    Integer currentTime = Math.round(thermostatTimeSec - thermostatTimezoneOffsetSec - 946684800)
 
-    Integer currentTimeToSend = zigbee.convertHexToInt(hex(currentTimeToDisplay))
-    cmds += zigbee.writeAttribute(0xFF01, 0x0020, DataType.UINT32, currentTimeToSend, [mfgCode: '0x119C'])
-
-    sendCommands(cmds)
-}
-
-void refresh_misc() {
-    List cmds = []
-
-    // °C or °F
-    if (state?.scale == 'C') {
-        cmds += zigbee.writeAttribute(0x0204, 0x0000, DataType.ENUM8, 0)  // °C on thermostat display
-    }
-    else {
-        cmds += zigbee.writeAttribute(0x0204, 0x0000, DataType.ENUM8, 1)  // °F on thermostat display
-    }
+    cmds += zigbee.writeAttribute(0xFF01, 0x0020, DataType.UINT32, currentTime, [mfgCode: '0x119C'])
 
     sendCommands(cmds)
-    setClockTime()
-
-    // Backlight
-    if (settings.backlightAutoDimParam == 'On Demand') {
-        disableBacklight()
-    }
-    else {
-        enableBacklight()
-    }
 }
 
 void setHeatingSetpoint(Double degrees) {
@@ -454,17 +430,36 @@ void mode_heat() {
 
 // Cannot be private to be executed by runIn
 void requestPower() {
+
+}
+
+private void refresh_misc() {
     List cmds = []
-    cmds += zigbee.readAttribute(0x0B04, 0x050B)
+
+    // °C or °F
+    if (state?.scale == 'C') {
+        cmds += zigbee.writeAttribute(0x0204, 0x0000, DataType.ENUM8, 0)  // °C on thermostat display
+    } else {
+        cmds += zigbee.writeAttribute(0x0204, 0x0000, DataType.ENUM8, 1)  // °F on thermostat display
+    }
+
     sendCommands(cmds)
+    setClockTime()
+
+    // Backlight
+    if (settings.backlightAutoDimParam == 'On Demand') {
+        disableBacklight()
+    } else {
+        enableBacklight()
+    }
 }
 
 private void sendOutdoorTemperature(Double outdoorTemp) {
     List cmds = []
     Integer timeout = 3 * 60 * 60 // 3 hours
-    Integer outdoorTempHex = zigbee.convertHexToInt(hex(outdoorTemp * 100))
+    Integer outdoorTempInt = Math.round(outdoorTemp * 100)
     cmds += zigbee.writeAttribute(0xFF01, 0x0011, DataType.UINT16, timeout, [:], 1000)
-    cmds += zigbee.writeAttribute(0xFF01, 0x0010, DataType.INT16, outdoorTempHex, [mfgCode: '0x119C'], 1000)
+    cmds += zigbee.writeAttribute(0xFF01, 0x0010, DataType.INT16, outdoorTempInt, [mfgCode: '0x119C'], 1000)
     sendCommands(cmds)
 }
 
@@ -522,10 +517,6 @@ private Double getTemperatureValue(String value, Boolean doRounding = false) {
         }
         return Math.round(celsiusToFahrenheit(celsius))
     }
-}
-
-private String hex(Double value) {
-    return new BigInteger(Math.round(value).toString()).toString(16)
 }
 
 private String getHeatingDemand(String value) {
