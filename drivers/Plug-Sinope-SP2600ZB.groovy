@@ -46,7 +46,7 @@ metadata
 }
 
 void installed() {
-    if (trace) {
+    if (settings.trace) {
         log.trace 'SP2600ZB >> installed()'
     }
     configure()
@@ -54,7 +54,7 @@ void installed() {
 }
 
 void updated() {
-    if (trace) {
+    if (settings.trace) {
         log.trace 'SP2600ZB >> updated()'
     }
     if (!state.updatedLastRanAt || now() >= state.updatedLastRanAt + 1000) {
@@ -65,14 +65,14 @@ void updated() {
 }
 
 void uninstalled() {
-    if (trace) {
+    if (settings.trace) {
         log.trace 'SP2600ZB >> uninstalled()'
     }
     unschedule()
 }
 
 void configure() {
-    if (trace) {
+    if (settings.trace) {
         log.trace 'SP2600ZB >> configure()'
     }
     try {
@@ -132,14 +132,14 @@ Map parse(String description) {
         }
     }
 
-    if (trace) {
+    if (settings.trace) {
         log.trace "SP2600ZB >> parse(description) ==> ${event.name}: ${event.value}"
     }
     return event
 }
 
 void refresh() {
-    if (trace) {
+    if (settings.trace) {
         log.trace 'SP2600ZB >> refresh()'
     }
 
@@ -151,7 +151,7 @@ void refresh() {
 }
 
 void off() {
-    if (trace) {
+    if (settings.trace) {
         log.trace 'SP2600ZB >> off()'
     }
     state.flashing = false
@@ -160,7 +160,7 @@ void off() {
 }
 
 void on() {
-    if (trace) {
+    if (settings.trace) {
         log.trace 'SP2600ZB >> on()'
     }
     state.flashing = false
