@@ -516,12 +516,11 @@ private Double getTemperatureValue(String value, Boolean doRounding = false) {
     return Math.round(celsiusToFahrenheit(celsius))
 }
 
-private String getHeatingDemand(String value) {
+private Integer getHeatingDemand(String value) {
     if (value == null) {
         return
     }
-    Integer demand = Integer.parseInt(value, 16)
-    return demand.toString()
+    return Integer.parseInt(value, 16)
 }
 
 private Integer getActivePower(String value) {
