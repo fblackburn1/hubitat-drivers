@@ -490,33 +490,30 @@ private Double checkTemperature(Double temperature) {
 }
 
 private Double getTemperatureValue(String value, Boolean doRounding = false) {
-    String scale = state?.scale
-
-    if (value != null) {
-        Double celsius = (Integer.parseInt(value, 16) / 100).toDouble()
-
-        if (scale == 'C') {
-            if (doRounding) {
-                String tempValueString = String.format('%2.1f', celsius)
-
-                if (tempValueString.matches('.*([.,][456])')) {
-                    tempValueString = String.format('%2d.5', celsius.intValue())
-                }
-
-                else if (tempValueString.matches('.*([.,][789])')) {
-                    celsius = celsius.intValue() + 1
-                    tempValueString = String.format('%2d.0', celsius.intValue())
-                }
-                else {
-                    tempValueString = String.format('%2d.0', celsius.intValue())
-                }
-
-                return tempValueString.toDouble().round(1)
-            }
-            return celsius.round(1)
-        }
-        return Math.round(celsiusToFahrenheit(celsius))
+    if (value == null) {
+        return
     }
+
+    Double celsius = (Integer.parseInt(value, 16) / 100).toDouble()
+    String scale = state?.scale
+    if (scale == 'C') {
+        if (doRounding) {
+            String tempValueString = String.format('%2.1f', celsius)
+
+            if (tempValueString.matches('.*([.,][456])')) {
+                tempValueString = String.format('%2d.5', celsius.intValue())
+            } else if (tempValueString.matches('.*([.,][789])')) {
+                celsius = celsius.intValue() + 1
+                tempValueString = String.format('%2d.0', celsius.intValue())
+            } else {
+                tempValueString = String.format('%2d.0', celsius.intValue())
+            }
+
+            return tempValueString.toDouble().round(1)
+        }
+        return celsius.round(1)
+    }
+    return Math.round(celsiusToFahrenheit(celsius))
 }
 
 private String getHeatingDemand(String value) {
