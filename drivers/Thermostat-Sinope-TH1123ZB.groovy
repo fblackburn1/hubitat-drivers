@@ -27,30 +27,6 @@
 // * Sinopé => https://github.com/SmartThingsCommunity/SmartThingsPublic/blob/master/devicetypes/sinope-technologies/th1123zb-th1124zb-sinope-thermostat.src/th1123zb-th1124zb-sinope-thermostat.groovy
 // * scoulombe => https://github.com/scoulombe79/HubitatDrivers/blob/master/Thermostat-Sinope-TH1123ZB.groovy
 
-preferences
-{
-    input(
-        'backlightAutoDimParam',
-        'enum',
-        title:'Display backlight',
-        options: ['On Demand', 'Always On (Default)'],
-        multiple: false,
-        required: false,
-    )
-    input(
-        'timeFormatParam',
-        'enum',
-        title:'Clock display format',
-        options:['12 Hour', '24 Hour (Default)'],
-        multiple: false,
-        required: false,
-    )
-    input(
-        'trace',
-        'bool',
-        title: 'Enable debug logging',
-    )
-}
 
 metadata
 {
@@ -58,7 +34,6 @@ metadata
         name: 'TH1123ZB-TH1124ZB Sinope Thermostat',
         namespace: 'fblackburn',
         author: 'fblackburn',
-        ocfDeviceType: 'oic.d.thermostat'
     ) {
         capability 'Configuration'
         capability 'Thermostat'
@@ -114,6 +89,32 @@ metadata
             deviceJoinName: 'Sinope TH1123ZB-TH1124ZB Thermostat',
             inClusters: '0000,0003,0004,0005,0201,0204,0402,0B04,0B05,FF01',
             outClusters: '0019,FF01',
+        )
+    }
+
+    preferences
+    {
+        input(
+            name: 'backlightAutoDimParam',
+            type: 'enum',
+            title:'Display backlight',
+            options: ['On Demand', 'Always On (Default)'],
+            multiple: false,
+            required: false,
+        )
+        input(
+            name: 'timeFormatParam',
+            type: 'enum',
+            title:'Clock display format',
+            options:['12 Hour', '24 Hour (Default)'],
+            multiple: false,
+            required: false,
+        )
+        input(
+            name: 'trace',
+            type: 'bool',
+            title: 'Enable debug logging',
+            defaultValue: false
         )
     }
 }
