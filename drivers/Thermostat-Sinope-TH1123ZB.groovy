@@ -187,8 +187,7 @@ Map parse(String description) {
         event.name = 'temperature'
         event.value = getTemperatureValue(descMap.value)
         event.unit = '°' + scale
-    }
-    else if (descMap.cluster == '0201' && descMap.attrId == '0008') {
+    } else if (descMap.cluster == '0201' && descMap.attrId == '0008') {
         event.name = 'heatingDemand'
         event.value = getHeatingDemand(descMap.value)
         event.unit = '%'
@@ -197,34 +196,27 @@ Map parse(String description) {
         subEvent.descriptionText = device.getLabel() + ' ' + subEvent.name + ' is ' + subEvent.value
         sendEvent(subEvent)
         runIn(1, requestPower)
-    }
-    else if (descMap.cluster == '0B04' && descMap.attrId == '050B') {
+    } else if (descMap.cluster == '0B04' && descMap.attrId == '050B') {
         event.name = 'power'
         event.value = getActivePower(descMap.value)
         event.unit = 'W'
-    }
-    else if (descMap.cluster == '0201' && descMap.attrId == '0012') {
+    } else if (descMap.cluster == '0201' && descMap.attrId == '0012') {
         event.name = 'heatingSetpoint'
         event.value = getTemperatureValue(descMap.value, true)
         event.unit = '°' + scale
-    }
-    else if (descMap.cluster == '0201' && descMap.attrId == '0014') {
+    } else if (descMap.cluster == '0201' && descMap.attrId == '0014') {
         event.name = 'heatingSetpoint'
         event.value = getTemperatureValue(descMap.value, true)
         event.unit = '°' + scale
-    }
-    else if (descMap.cluster == '0201' && descMap.attrId == '001C') {
+    } else if (descMap.cluster == '0201' && descMap.attrId == '001C') {
         event.name = 'thermostatMode'
         event.value = getModeMap()[descMap.value]
-    }
-    else if (descMap.cluster == '0204' && descMap.attrId == '0001') {
+    } else if (descMap.cluster == '0204' && descMap.attrId == '0001') {
         event.name = 'lock'
         event.value = getLockMap()[descMap.value]
     } else {
         log.warn "TH112XZB >> parse(descMap) ==> Unhandled attribute: ${descMap}"
     }
-    else {
-        log.trace 'TH112XZB >> parse(descMap) ==> ' + descMap
     }
 
     if (settings.trace) {
@@ -303,8 +295,7 @@ void displayTemperature(String choice) {
     }
     if (state.outdoorTemperature && choice == 'Outdoor') {
         sendOutdoorTemperature(state.outdoorTemperature)
-    }
-    else {
+    } else {
         sendSetpointTemperature()
     }
     state.displayTemperature = choice
@@ -505,20 +496,16 @@ private Double checkTemperature(Double temperature) {
     if (scale == 'F') {
         if (number < 41) {
             number = 41
-        }
-        else if (number > 86) {
+        } else if (number > 86) {
             number = 86
         }
-    }
-    else { //scale == 'C'
+    } else { //scale == 'C'
         if (number < 5) {
             number = 5
-        }
-        else if (number > maxCelcius) {
+        } else if (number > maxCelcius) {
             number = maxCelcius
         }
     }
-
     return number
 }
 
