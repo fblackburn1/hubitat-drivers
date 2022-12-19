@@ -27,6 +27,7 @@
 // * Sinopé => https://github.com/SmartThingsCommunity/SmartThingsPublic/blob/master/devicetypes/sinope-technologies/th1123zb-th1124zb-sinope-thermostat.src/th1123zb-th1124zb-sinope-thermostat.groovy
 // * scoulombe => https://github.com/scoulombe79/HubitatDrivers/blob/master/Thermostat-Sinope-TH1123ZB.groovy
 
+import hubitat.device.HubMultiAction
 
 metadata
 {
@@ -573,16 +574,7 @@ private Map getLockMap() {
     ]
 }
 
-private void sendCommands(List commands) {
-    if (commands != null && commands.size() > 0) {
-        if (settings.trace) {
-            log.trace('Executing commands:' + commands)
-        }
-
-        for (String value : commands) {
-            sendHubCommand([value].collect {
-                command -> new hubitat.device.HubAction(command, hubitat.device.Protocol.ZIGBEE)
-            })
-        }
-    }
+private void sendCommands(List<Map> commands) {
+    HubMultiAction actions = new HubMultiAction(commands, hubitat.device.Protocol.ZIGBEE)
+    sendHubCommand(actions)
 }
