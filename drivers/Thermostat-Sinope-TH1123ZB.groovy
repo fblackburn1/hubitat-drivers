@@ -133,7 +133,7 @@ void updated() {
         log.trace 'TH112XZB >> updated()'
     }
 
-    if (!state.updatedLastRanAt || now() >= state.updatedLastRanAt + 1000) {
+    if (!state.updatedLastRanAt || now() >= state.updatedLastRanAt + 2000) {
         state.updatedLastRanAt = now()
         try {
             unschedule()
@@ -260,10 +260,9 @@ void refresh() {
     if (settings.trace) {
         log.trace 'TH112XZB >> refresh()'
     }
-
     if (state.updatedLastRanAt && now() < state.updatedLastRanAt + 5000) {
         if (settings.trace) {
-            log.trace 'TH112XZB >> refresh() --- Ran within last 5 seconds so aborting'
+            log.trace 'TH112XZB >> refresh() ==> Ran within last 5 seconds so aborting'
         }
         return
     }
