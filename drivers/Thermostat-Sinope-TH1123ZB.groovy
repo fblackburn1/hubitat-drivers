@@ -135,11 +135,6 @@ void updated() {
 
     if (!state.updatedLastRanAt || now() >= state.updatedLastRanAt + 2000) {
         state.updatedLastRanAt = now()
-        try {
-            unschedule()
-        }
-        catch (ignored) { }
-
         refresh_misc()
     }
 }
@@ -151,12 +146,10 @@ void configure() {
 
     // Configure reporting
     List cmds = []
-    cmds += zigbee.configureReporting(0x0201, 0x0000, DataType.INT16, 19, 301, 50)      // local temperature
-    cmds += zigbee.configureReporting(0x0201, 0x0008, DataType.UINT8, 4, 300, 10)       // heating demand
-    cmds += zigbee.configureReporting(0x0201, 0x0012, DataType.INT16, 15, 302, 40)      // occupied heating setpoint
-    // FIXME: Doesn't seem to work
-    cmds += zigbee.configureReporting(0x0B04, 0x050B, DataType.INT16, 30, 599, 0x64)    // active power
-
+    cmds += zigbee.configureReporting(0x0201, 0x0000, DataType.INT16, 19, 301, 50) // Temperature
+    cmds += zigbee.configureReporting(0x0201, 0x0008, DataType.UINT8, 4, 300, 10)  // Heating (%)
+    cmds += zigbee.configureReporting(0x0201, 0x0012, DataType.INT16, 15, 302, 40) // Heating Setpoint (°)
+    // FIXME add Energy
     sendCommands(cmds)
     refresh_misc()
 }
@@ -165,10 +158,6 @@ void uninstalled() {
     if (settings.trace) {
         log.trace 'TH112XZB >> uninstalled()'
     }
-    try {
-        unschedule()
-    }
-    catch (ignored) { }
 }
 
 Map parse(String description) {
@@ -196,7 +185,7 @@ Map parse(String description) {
         Map subEvent = ['name': 'thermostatOperatingState', 'value': operatingState]
         subEvent.descriptionText = "${device.getLabel()} ${subEvent.name} is ${subEvent.value}"
         sendEvent(subEvent)
-        runIn(1, requestPower)
+        // FIXME: Calculate power
     } else if (descMap.cluster == '0B04' && descMap.attrId == '050B') {
         event.name = 'power'
         event.value = getActivePower(descMap.value)
@@ -425,11 +414,6 @@ void mode_heat() {
     cmds += zigbee.writeAttribute(0x0201, 0x001C, DataType.ENUM8, 4)
     cmds += zigbee.readAttribute(0x0201, 0x001C)
     sendCommands(cmds)
-}
-
-// Cannot be private to be executed by runIn
-void requestPower() {
-
 }
 
 private void refresh_misc() {
