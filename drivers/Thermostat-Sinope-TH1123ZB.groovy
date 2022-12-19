@@ -182,7 +182,7 @@ Map parse(String description) {
     Map event = [:]
     String scale = getTemperatureScale()
     Map descMap = zigbee.parseDescriptionAsMap(description)
-    state?.scale = scale
+    state.scale = scale
 
     if (descMap.cluster == '0201' && descMap.attrId == '0000') {
         event.name = 'temperature'
@@ -240,8 +240,7 @@ void unlock() {
     event.descriptionText = "${device.getLabel()} ${event.name} is ${event.value}"
     sendEvent(event)
 
-    List cmds = []
-    cmds += zigbee.writeAttribute(0x0204, 0x0001, DataType.ENUM8, 0x00)
+    List cmds = zigbee.writeAttribute(0x0204, 0x0001, DataType.ENUM8, 0x00)
     sendCommands(cmds)
 }
 
@@ -253,8 +252,7 @@ void lock() {
     event.descriptionText = "${device.getLabel()} ${event.name} is ${event.value}"
     sendEvent(event)
 
-    List cmds = []
-    cmds += zigbee.writeAttribute(0x0204, 0x0001, DataType.ENUM8, 0x01)
+    List cmds = zigbee.writeAttribute(0x0204, 0x0001, DataType.ENUM8, 0x01)
     sendCommands(cmds)
 }
 
@@ -308,8 +306,7 @@ void enableBacklight() {
     if (settings.trace) {
         log.trace 'TH112XZB >> enableBacklight()'
     }
-    List cmds = []
-    cmds += zigbee.writeAttribute(0x0201, 0x0402, DataType.ENUM8, 0x0001)
+    List cmds = zigbee.writeAttribute(0x0201, 0x0402, DataType.ENUM8, 0x0001)
     sendCommands(cmds)
 }
 
@@ -317,8 +314,7 @@ void disableBacklight() {
     if (settings.trace) {
         log.trace 'TH112XZB >> disableBacklight()'
     }
-    List cmds = []
-    cmds += zigbee.writeAttribute(0x0201, 0x0402, DataType.ENUM8, 0x0000)
+    List cmds = zigbee.writeAttribute(0x0201, 0x0402, DataType.ENUM8, 0x0000)
     sendCommands(cmds)
 }
 
@@ -330,11 +326,10 @@ void setClockTime() {
     // Time Format
     if (settings.timeFormatParam == '12 Hour') {
         // 12 Hour
-        cmds += zigbee.writeAttribute(0xFF01, 0x0114, 0x30, 0x0001)
-    }
-    else {
+        cmds += zigbee.writeAttribute(0xFF01, 0x0114, DataType.ENUM8, 0x0001)
+    } else {
         // 24 Hour
-        cmds += zigbee.writeAttribute(0xFF01, 0x0114, 0x30, 0x0000)
+        cmds += zigbee.writeAttribute(0xFF01, 0x0114, DataType.ENUM8, 0x0000)
     }
 
     // Time
@@ -441,7 +436,7 @@ void mode_off() {
     }
 
     List cmds = []
-    cmds += zigbee.writeAttribute(0x0201, 0x001C, 0x30, 0)
+    cmds += zigbee.writeAttribute(0x0201, 0x001C, DataType.ENUM8, 0)
     cmds += zigbee.readAttribute(0x0201, 0x001C)
     sendCommands(cmds)
 }
@@ -452,7 +447,7 @@ void mode_heat() {
     }
 
     List cmds = []
-    cmds += zigbee.writeAttribute(0x0201, 0x001C, 0x30, 4)
+    cmds += zigbee.writeAttribute(0x0201, 0x001C, DataType.ENUM8, 4)
     cmds += zigbee.readAttribute(0x0201, 0x001C)
     sendCommands(cmds)
 }
@@ -474,8 +469,7 @@ private void sendOutdoorTemperature(Double outdoorTemp) {
 }
 
 private void sendSetpointTemperature() {
-    List cmds = []
-    cmds += zigbee.writeAttribute(0xFF01, 0x0010, DataType.INT16, 0x8000)
+    List cmds = zigbee.writeAttribute(0xFF01, 0x0010, DataType.INT16, 0x8000)
     sendCommands(cmds)
 }
 
@@ -546,8 +540,7 @@ private Integer getActivePower(String value) {
     if (value == null) {
         return
     }
-    Integer activePower = Integer.parseInt(value, 16)
-    return activePower
+    return Integer.parseInt(value, 16)
 }
 
 private Map getModeMap() {
