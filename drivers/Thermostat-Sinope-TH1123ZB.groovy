@@ -148,11 +148,19 @@ void configure() {
         log.trace 'TH112XZB >> configure()'
     }
 
+    try {
+        unschedule()
+    }
+    catch (ignored) { }
+
     // Configure reporting
     List cmds = []
     cmds += zigbee.configureReporting(0x0201, 0x0000, DataType.INT16, 19, 301, 50) // Temperature
     cmds += zigbee.configureReporting(0x0201, 0x0008, DataType.UINT8, 4, 300, 10)  // Heating (%)
     cmds += zigbee.configureReporting(0x0201, 0x0012, DataType.INT16, 15, 302, 40) // Heating Setpoint (°)
+
+    runEvery3Hours('handlePowerOutage')
+
     // FIXME add Energy
     sendCommands(cmds)
     refresh_misc()
@@ -162,6 +170,7 @@ void uninstalled() {
     if (settings.trace) {
         log.trace 'TH112XZB >> uninstalled()'
     }
+    unschedule()
 }
 
 Map parse(String description) {
@@ -428,6 +437,15 @@ void mode_heat() {
     cmds += zigbee.writeAttribute(0x0201, 0x001C, DataType.ENUM8, 4)
     cmds += zigbee.readAttribute(0x0201, 0x001C)
     sendCommands(cmds)
+}
+
+// Cannot be private to be executed by runIn
+void handlePowerOutage() {
+    // Maximum power can change with time (i.e. after a power outage)
+    List cmds = zigbee.readAttribute(0x0B04, 0x050D) // Maximum power available
+    sendCommands(cmds)
+    // Clock can be desynced with time (i.e. after a power outage or summer time)
+    setClockTime()
 }
 
 private void refresh_misc() {
