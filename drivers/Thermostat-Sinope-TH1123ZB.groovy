@@ -183,13 +183,11 @@ Map parse(String description) {
     }
 
     Map event = [:]
-    String scale = getTemperatureScale()
     Map descMap = zigbee.parseDescriptionAsMap(description)
-    state.scale = scale
-
     if (descMap.cluster == '0201' && descMap.attrId == '0000') {
+        String scale = getTemperatureScale()
         event.name = 'temperature'
-        event.value = getTemperatureValue(descMap.value)
+        event.value = getTemperatureValue(descMap.value, scale)
         event.unit = "°${scale}"
     } else if (descMap.cluster == '0201' && descMap.attrId == '0008') {
         Integer heatingDemand = getHeatingDemand(descMap.value)
@@ -233,12 +231,14 @@ Map parse(String description) {
         event.value = getPower(descMap.value)
         event.unit = 'W'
     } else if (descMap.cluster == '0201' && descMap.attrId == '0012') {
+        String scale = getTemperatureScale()
         event.name = 'heatingSetpoint'
-        event.value = getTemperatureValue(descMap.value, true)
+        event.value = getTemperatureValue(descMap.value, scale, true)
         event.unit = "°${scale}"
     } else if (descMap.cluster == '0201' && descMap.attrId == '0014') {
+        String scale = getTemperatureScale()
         event.name = 'heatingSetpoint'
-        event.value = getTemperatureValue(descMap.value, true)
+        event.value = getTemperatureValue(descMap.value, scale, true)
         event.unit = "°${scale}"
     } else if (descMap.cluster == '0201' && descMap.attrId == '001C') {
         event.name = 'thermostatMode'
@@ -372,7 +372,7 @@ void setHeatingSetpoint(Double degrees) {
         log.trace "TH112XZB >> setHeatingSetpoint(${degrees})"
     }
     String scale = getTemperatureScale()
-    Double degreesScoped = checkTemperature(degrees)
+    Double degreesScoped = checkTemperature(degrees, scale)
     Double celsius = (scale == 'C') ? degreesScoped : fahrenheitToCelsius(degreesScoped).round(1)
     Integer celsiusRound = Math.round(celsius * 100)
 
@@ -464,7 +464,8 @@ private void refresh_misc() {
     List cmds = []
 
     // °C or °F
-    if (state?.scale == 'C') {
+    String scale = getTemperatureScale()
+    if (scale == 'C') {
         cmds += zigbee.writeAttribute(0x0204, 0x0000, DataType.ENUM8, 0)  // °C
     } else {
         cmds += zigbee.writeAttribute(0x0204, 0x0000, DataType.ENUM8, 1)  // °F
@@ -502,8 +503,7 @@ private void sendSetpointTemperature() {
     sendCommands(cmds)
 }
 
-private Double checkTemperature(Double temperature) {
-    String scale = getTemperatureScale()
+private Double checkTemperature(Double temperature, String scale) {
     Double number = temperature
     Integer maxCelcius = 25
 
@@ -523,13 +523,12 @@ private Double checkTemperature(Double temperature) {
     return number
 }
 
-private Double getTemperatureValue(String value, Boolean doRounding = false) {
+private Double getTemperatureValue(String value, String scale, Boolean doRounding = false) {
     if (value == null) {
         return
     }
 
     Double celsius = (Integer.parseInt(value, 16) / 100).toDouble()
-    String scale = state?.scale
     if (scale == 'C') {
         if (doRounding) {
             String tempValueString = String.format('%2.1f', celsius)
