@@ -194,9 +194,10 @@ Map parse(String description) {
         event.name = 'heatingDemand'
         event.value = heatingDemand
         event.unit = '%'
+
         String operatingState = (event.value.toInteger() < 10) ? 'idle' : 'heating'
         Map opEvent = ['name': 'thermostatOperatingState', 'value': operatingState]
-        opEvent.descriptionText = "${device.getLabel()} ${opEvent.name} is ${opEvent.value}"
+        opEvent.descriptionText = generateDescription(opEvent)
         if (settings.trace) {
             log.trace "TH112XZB >> parse(description) ==> ${opEvent.name}: ${opEvent.value}"
         }
@@ -206,7 +207,7 @@ Map parse(String description) {
         if (maxPower != null) {
             Integer power = Math.round(maxPower * heatingDemand / 100)
             Map powerEvent = [name: 'power', value: power, unit: 'W']
-            powerEvent.descriptionText = "${device.getLabel()} ${powerEvent.name} is ${powerEvent.value}"
+            powerEvent.descriptionText = generateDescription(powerEvent)
             if (settings.trace) {
                 log.trace "TH112XZB >> parse(description) ==> ${powerEvent.name}: ${powerEvent.value}"
             }
@@ -248,14 +249,9 @@ Map parse(String description) {
         event.value = getLockMap()[descMap.value]
     } else {
         log.warn "TH112XZB >> parse(descMap) ==> Unhandled attribute: ${descMap}"
+        return [:]
     }
-
-    if (event.name && event.value) {
-        event.descriptionText = "${device.getLabel()} ${event.name} is ${event.value}"
-        if (event.unit) {
-            event.descriptionText = "${event.descriptionText}${event.unit}"
-        }
-    }
+    event.descriptionText = generateDescription(event)
 
     if (settings.trace) {
         log.trace "TH112XZB >> parse(description) ==> ${event.name}: ${event.value}"
@@ -458,6 +454,17 @@ void handlePowerOutage() {
     sendCommands(cmds)
     // Clock can be desynced with time (i.e. after a power outage or summer time)
     setClockTime()
+}
+
+private String generateDescription(Map event){
+    String description = null
+    if (event.name && event.value) {
+        description = "${device.getLabel()} ${event.name} is ${event.value}"
+        if (event.unit) {
+            return "${event.descriptionText}${event.unit}"
+        }
+    }
+    return description
 }
 
 private void refresh_misc() {
