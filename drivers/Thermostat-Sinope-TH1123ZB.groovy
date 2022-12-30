@@ -44,6 +44,7 @@ metadata
         capability 'ThermostatMode'
         capability 'Lock'
         capability 'PowerMeter'
+        capability 'EnergyMeter'
 
         attribute 'maxPower', 'number'
 
@@ -158,10 +159,10 @@ void configure() {
     cmds += zigbee.configureReporting(0x0201, 0x0000, DataType.INT16, 19, 301, 50) // Temperature
     cmds += zigbee.configureReporting(0x0201, 0x0008, DataType.UINT8, 4, 300, 10)  // Heating (%)
     cmds += zigbee.configureReporting(0x0201, 0x0012, DataType.INT16, 15, 302, 40) // Heating Setpoint (°)
+    cmds += zigbee.configureReporting(0x0702, 0x0000, DataType.UINT48, 300, 1800, 50) // Energy (Wh)
 
     runEvery3Hours('handlePowerOutage')
 
-    // FIXME add Energy
     sendCommands(cmds)
     refresh_misc()
 }
@@ -212,6 +213,16 @@ Map parse(String description) {
                 log.trace "TH112XZB >> parse(description) ==> ${powerEvent.name}: ${powerEvent.value}"
             }
             sendEvent(powerEvent)
+        }
+    } else if (descMap.cluster == '0702' && descMap.attrId == '0000') {
+        BigInteger newEnergyValue = getEnergy(descMap.value)
+        if (newEnergyValue == 0) {
+            // FIXME Not able to reproduce this behavior with TH112XZB
+            log.warn 'TH112XZB >> Ignoring energy event (Caused: unknown)'
+        } else {
+            event.name = 'energy'
+            event.value = newEnergyValue / 1000
+            event.unit = 'kWh'
         }
     } else if (descMap.cluster == '0B04' && descMap.attrId == '050B') {
         event.name = 'power'
@@ -296,6 +307,7 @@ void refresh() {
     cmds += zigbee.readAttribute(0x0204, 0x0001)  // Rd thermostat Keypad lock
     cmds += zigbee.readAttribute(0x0B04, 0x050B)  // Rd thermostat Active power
     cmds += zigbee.readAttribute(0x0B04, 0x050D)  // Rd thermostat maximum power available
+    cmds += zigbee.readAttribute(0x0702, 0x0000) // Rd thermostat total Energy
     sendCommands(cmds)
 }
 
@@ -550,6 +562,13 @@ private Integer getPower(String value) {
         return
     }
     return Integer.parseInt(value, 16)
+}
+
+private BigInteger getEnergy(String value) {
+    if (value == null) {
+        return 0
+    }
+    return new BigInteger(value, 16)
 }
 
 private Map getModeMap() {
