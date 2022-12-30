@@ -45,6 +45,8 @@ metadata
         capability 'Lock'
         capability 'PowerMeter'
 
+        attribute 'maxPower', 'number'
+
         command(
             'setThermostatMode',
             [[
@@ -180,17 +182,35 @@ Map parse(String description) {
         event.value = getTemperatureValue(descMap.value)
         event.unit = "°${scale}"
     } else if (descMap.cluster == '0201' && descMap.attrId == '0008') {
+        Integer heatingDemand = getHeatingDemand(descMap.value)
         event.name = 'heatingDemand'
-        event.value = getHeatingDemand(descMap.value)
+        event.value = heatingDemand
         event.unit = '%'
         String operatingState = (event.value.toInteger() < 10) ? 'idle' : 'heating'
-        Map subEvent = ['name': 'thermostatOperatingState', 'value': operatingState]
-        subEvent.descriptionText = "${device.getLabel()} ${subEvent.name} is ${subEvent.value}"
-        sendEvent(subEvent)
-        // FIXME: Calculate power
+        Map opEvent = ['name': 'thermostatOperatingState', 'value': operatingState]
+        opEvent.descriptionText = "${device.getLabel()} ${opEvent.name} is ${opEvent.value}"
+        if (settings.trace) {
+            log.trace "TH112XZB >> parse(description) ==> ${opEvent.name}: ${opEvent.value}"
+        }
+        sendEvent(opEvent)
+
+        Integer maxPower = device.currentValue('maxPower')
+        if (maxPower != null) {
+            Integer power = Math.round(maxPower * heatingDemand / 100)
+            Map powerEvent = [name: 'power', value: power, unit: 'W']
+            powerEvent.descriptionText = "${device.getLabel()} ${powerEvent.name} is ${powerEvent.value}"
+            if (settings.trace) {
+                log.trace "TH112XZB >> parse(description) ==> ${powerEvent.name}: ${powerEvent.value}"
+            }
+            sendEvent(powerEvent)
+        }
     } else if (descMap.cluster == '0B04' && descMap.attrId == '050B') {
         event.name = 'power'
-        event.value = getActivePower(descMap.value)
+        event.value = getPower(descMap.value)
+        event.unit = 'W'
+    } else if (descMap.cluster == '0B04' && descMap.attrId == '050D') {
+        event.name = 'maxPower'
+        event.value = getPower(descMap.value)
         event.unit = 'W'
     } else if (descMap.cluster == '0201' && descMap.attrId == '0012') {
         event.name = 'heatingSetpoint'
@@ -266,6 +286,7 @@ void refresh() {
     cmds += zigbee.readAttribute(0x0201, 0x001C)  // Rd thermostat System Mode
     cmds += zigbee.readAttribute(0x0204, 0x0001)  // Rd thermostat Keypad lock
     cmds += zigbee.readAttribute(0x0B04, 0x050B)  // Rd thermostat Active power
+    cmds += zigbee.readAttribute(0x0B04, 0x050D)  // Rd thermostat maximum power available
     sendCommands(cmds)
 }
 
@@ -506,7 +527,7 @@ private Integer getHeatingDemand(String value) {
     return Integer.parseInt(value, 16)
 }
 
-private Integer getActivePower(String value) {
+private Integer getPower(String value) {
     if (value == null) {
         return
     }
