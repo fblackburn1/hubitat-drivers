@@ -99,7 +99,8 @@ metadata
             name: 'backlightAutoDimParam',
             type: 'enum',
             title:'Display backlight',
-            options: ['On Demand', 'Always On (Default)'],
+            options: ['On Demand', 'Always On'],
+            defaultValue: getDefaultBacklight(),
             multiple: false,
             required: false,
         )
@@ -107,7 +108,8 @@ metadata
             name: 'timeFormatParam',
             type: 'enum',
             title:'Clock display format',
-            options:['12 Hour', '24 Hour (Default)'],
+            options:['12 Hour', '24 Hour'],
+            defaultValue: getDefaultTimeFormat(),
             multiple: false,
             required: false,
         )
@@ -310,15 +312,6 @@ void setClockTime() {
     if (settings.trace) {
         log.trace 'TH112XZB >> setClockTime()'
     }
-    List cmds = []
-    // Time Format
-    if (settings.timeFormatParam == '12 Hour') {
-        // 12 Hour
-        cmds += zigbee.writeAttribute(0xFF01, 0x0114, DataType.ENUM8, 0x0001)
-    } else {
-        // 24 Hour
-        cmds += zigbee.writeAttribute(0xFF01, 0x0114, DataType.ENUM8, 0x0000)
-    }
 
     // Time
     /* groovylint-disable-next-line NoJavaUtilDate */
@@ -421,16 +414,23 @@ private void refresh_misc() {
 
     // °C or °F
     if (state?.scale == 'C') {
-        cmds += zigbee.writeAttribute(0x0204, 0x0000, DataType.ENUM8, 0)  // °C on thermostat display
+        cmds += zigbee.writeAttribute(0x0204, 0x0000, DataType.ENUM8, 0)  // °C
     } else {
-        cmds += zigbee.writeAttribute(0x0204, 0x0000, DataType.ENUM8, 1)  // °F on thermostat display
+        cmds += zigbee.writeAttribute(0x0204, 0x0000, DataType.ENUM8, 1)  // °F
+    }
+
+    String timeFormat = settings.timeFormatParam == null ? getDefaultTimeFormat() : settings.timeFormatParam
+    if (timeFormat == '12 Hour') {
+        cmds += zigbee.writeAttribute(0xFF01, 0x0114, DataType.ENUM8, 0x0001) // 12 Hour
+    } else {
+        cmds += zigbee.writeAttribute(0xFF01, 0x0114, DataType.ENUM8, 0x0000) // 24 Hour
     }
 
     sendCommands(cmds)
     setClockTime()
 
-    // Backlight
-    if (settings.backlightAutoDimParam == 'On Demand') {
+    String backlight = settings.backlightAutoDimParam == null ? getDefaultBacklight() : settings.backlightAutoDimParam
+    if (backlight == 'On Demand') {
         disableBacklight()
     } else {
         enableBacklight()
@@ -527,6 +527,13 @@ private Map getLockMap() {
     ]
 }
 
+private String getDefaultBacklight() {
+    return 'Always On'
+}
+
+private String getDefaultTimeFormat() {
+    return '24 Hour'
+}
 private void sendCommands(List<Map> commands) {
     HubMultiAction actions = new HubMultiAction(commands, hubitat.device.Protocol.ZIGBEE)
     sendHubCommand(actions)
