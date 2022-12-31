@@ -7,25 +7,13 @@
 /**
  *  Thermostat Sinopé TH1123ZB-TH1124ZB Driver
  *
- *  Version: 0.3
- *  0.1   (2019-12-20) => First release
- *  0.2   (2019-12-21) => Added Lock / Unlock setting / HealthCheck
- *  0.3   (2019-12-22) => Fixed thermostat mode reporting, added thermostat mode setting, added power reporting (?)
- *  Author(0.1-0.3): scoulombe
- *  Date: 2019-12-22
- *
- *  0.4   (2021-12-12) => Added changes from SmartThings driver v1.2.0
- *  0.5   (2021-12-15) => Added possibility to set outdoor temperature from command and fixed power reporting event
- *  0.6   (2022-01-01) => Fixed duplicate events and added event descriptionText attribute
- *  0.7   (2022-01-09) => Added setClockTime command and updated time on "configure" command
- *  0.8   (2022-03-12) => Added enableBacklight and disableBacklight commands
- *  Author(0.4+): fblackburn
+ *  1.0 (2022-12-31): initial release
+ *  Author: fblackburn
+ *  Inspired by:
+ *    - Sinope => https://github.com/SmartThingsCommunity/SmartThingsPublic/tree/master/devicetypes/sinope-technologies
+ *    - scoulombe => https://github.com/scoulombe79/HubitatDrivers/blob/master/Thermostat-Sinope-TH1123ZB.groovy
+ *    - sacua => https://github.com/sacua/SinopeDriverHubitat/blob/main/drivers/SP2600ZB_Sinope_Hubitat.groovy
  */
-
-// Sources:
-/* groovylint-disable-next-line LineLength */
-// * Sinopé => https://github.com/SmartThingsCommunity/SmartThingsPublic/blob/master/devicetypes/sinope-technologies/th1123zb-th1124zb-sinope-thermostat.src/th1123zb-th1124zb-sinope-thermostat.groovy
-// * scoulombe => https://github.com/scoulombe79/HubitatDrivers/blob/master/Thermostat-Sinope-TH1123ZB.groovy
 
 import hubitat.device.HubMultiAction
 
