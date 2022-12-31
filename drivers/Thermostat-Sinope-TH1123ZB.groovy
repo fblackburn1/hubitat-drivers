@@ -1,9 +1,5 @@
-/* groovylint-disable DuplicateListLiteral */
-/* groovylint-disable DuplicateMapLiteral */
-/* groovylint-disable DuplicateNumberLiteral */
-/* groovylint-disable EmptyMethod */
-/* groovylint-disable UnnecessaryGetter */
-/* groovylint-disable UnnecessarySetter */
+/* groovylint-disable DuplicateListLiteral, DuplicateMapLiteral, DuplicateNumberLiteral */
+/* groovylint-disable UnnecessaryGetter, UnnecessarySetter */
 /**
  *  Thermostat Sinopé TH1123ZB-TH1124ZB Driver
  *
@@ -66,14 +62,15 @@ metadata
         command('enableBacklight')
         command('disableBacklight')
 
-        command 'emergencyHeat', [[name: 'Not Supported']]
-        command 'auto', [[name: 'Not Supported']]
-        command 'cool', [[name: 'Not Supported']]
-        command 'fanCirculate', [[name: 'Not Supported']]
-        command 'fanOn', [[name: 'Not Supported']]
-        command 'fanAuto', [[name: 'Not Supported']]
-        command 'setThermostatFanMode', [[name: 'Not Supported']]
-        command 'setCoolingSetpoint', [[name: 'Not Supported']]
+        List notSupported = [[name: 'Not Supported']]
+        command('emergencyHeat', notSupported)
+        command('auto', notSupported)
+        command('cool', notSupported)
+        command('fanCirculate', notSupported)
+        command('fanOn', notSupported)
+        command('fanAuto', notSupported)
+        command('setThermostatFanMode', notSupported)
+        command('setCoolingSetpoint', notSupported)
 
         fingerprint(
             manufacturer: 'Sinope Technologies',
@@ -379,21 +376,21 @@ void heat() {
     setThermostatMode('heat')
 }
 
-void cool() { }
+void cool() { return }
 
-void auto() { }
+void auto() { return }
 
-void emergencyHeat() { }
+void emergencyHeat() { return }
 
-void setCoolingSetpoint() { }
+void setCoolingSetpoint() { return }
 
-void fanCirculate() { }
+void fanCirculate() { return }
 
-void fanOn() { }
+void fanOn() { return }
 
-void fanAuto() { }
+void fanAuto() { return }
 
-void setThermostatFanMode() { }
+void setThermostatFanMode() { return }
 
 List<String> getSupportedThermostatModes() {
     return ['heat', 'off']
