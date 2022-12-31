@@ -57,11 +57,8 @@ void updated() {
     if (settings.trace) {
         log.trace 'SP2600ZB >> updated()'
     }
-    if (!state.updatedLastRanAt || now() >= state.updatedLastRanAt + 1000) {
-        state.updatedLastRanAt = now()
-        configure()
-        refresh()
-   }
+    configure()
+    refresh()
 }
 
 void uninstalled() {
@@ -83,7 +80,6 @@ void configure() {
         sendEvent(name: 'energy', value: 0, unit: 'kWh')
     }
 
-    // Configure reporting
     List cmds = []
     cmds += zigbee.configureReporting(0x0006, 0x0000, DataType.BOOLEAN, 0, 600, null) // State
     Integer powerChange = settings.powerChange == null ? getDefaultPowerChange() : settings.powerChange
@@ -115,14 +111,14 @@ Map parse(String description) {
     } else if (descMap.cluster == '0702' && descMap.attrId == '0000') {
         BigInteger newEnergyValue = getEnergy(descMap.value)
         if (newEnergyValue == 0) {
-            log.info 'SP2600ZB >> Power outage detected. Ignoring wrong energy event'
+            log.info 'SP2600ZB >> Ignoring energy event (Caused: power outage or new pairing device)'
         } else {
             event.name = 'energy'
             event.value = newEnergyValue / 1000
             event.unit = 'kWh'
         }
     } else {
-        log.warn "SP2600ZB >> parse(description) ==> Unhandled attribute: ${descMap}"
+        log.warn "SP2600ZB >> parse(descMap) ==> Unhandled attribute: ${descMap}"
     }
 
     if (event.name && event.value) {
@@ -142,6 +138,13 @@ void refresh() {
     if (settings.trace) {
         log.trace 'SP2600ZB >> refresh()'
     }
+    if (state.updatedLastRanAt && now() < state.updatedLastRanAt + 2000) {
+        if (settings.trace) {
+            log.trace 'SP2600ZB >> refresh() ==> Ran within last 2 seconds so aborting'
+        }
+        return
+    }
+    state.updatedLastRanAt = now()
 
     List cmds = []
     cmds += zigbee.readAttribute(0x0006, 0x0000) // State
