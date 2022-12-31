@@ -154,11 +154,11 @@ void configure() {
     }
     catch (ignored) { }
 
-    // Configure reporting
     List cmds = []
-    cmds += zigbee.configureReporting(0x0201, 0x0000, DataType.INT16, 19, 301, 50) // Temperature
-    cmds += zigbee.configureReporting(0x0201, 0x0008, DataType.UINT8, 4, 300, 10)  // Heating (%)
-    cmds += zigbee.configureReporting(0x0201, 0x0012, DataType.INT16, 15, 302, 40) // Heating Setpoint (°)
+    cmds += zigbee.configureReporting(0x0201, 0x0000, DataType.INT16, 19, 301, 50)    // Temperature
+    cmds += zigbee.configureReporting(0x0201, 0x0008, DataType.UINT8, 4, 300, 10)     // Heating (%)
+    cmds += zigbee.configureReporting(0x0201, 0x0012, DataType.INT16, 15, 302, 40)    // Heating Setpoint (°)
+    // Since energyValue will only increase with time, we can only use minReportTime (300)
     cmds += zigbee.configureReporting(0x0702, 0x0000, DataType.UINT48, 300, 1800, 50) // Energy (Wh)
 
     runEvery3Hours('handlePowerOutage')
@@ -177,7 +177,7 @@ void uninstalled() {
 Map parse(String description) {
     if (!description?.startsWith('read attr -')) {
         if (!description?.startsWith('catchall:')) {
-            log.warn "SP2600ZB >> parse(description) ==> Unhandled event: ${description}"
+            log.warn "TH112XZB >> parse(description) ==> Unhandled event: ${description}"
         }
         return [:]
     }
@@ -199,7 +199,7 @@ Map parse(String description) {
         Map opEvent = ['name': 'thermostatOperatingState', 'value': operatingState]
         opEvent.descriptionText = generateDescription(opEvent)
         if (settings.trace) {
-            log.trace "TH112XZB >> parse(description) ==> ${opEvent.name}: ${opEvent.value}"
+            log.trace "TH112XZB >> parse(description)[generated] ==> ${opEvent.name}: ${opEvent.value}"
         }
         sendEvent(opEvent)
 
@@ -209,18 +209,18 @@ Map parse(String description) {
             Map powerEvent = [name: 'power', value: power, unit: 'W']
             powerEvent.descriptionText = generateDescription(powerEvent)
             if (settings.trace) {
-                log.trace "TH112XZB >> parse(description) ==> ${powerEvent.name}: ${powerEvent.value}"
+                log.trace "TH112XZB >> parse(description)[generated] ==> ${powerEvent.name}: ${powerEvent.value}"
             }
             sendEvent(powerEvent)
         }
     } else if (descMap.cluster == '0702' && descMap.attrId == '0000') {
-        BigInteger newEnergyValue = getEnergy(descMap.value)
-        if (newEnergyValue == 0) {
+        BigInteger energy = getEnergy(descMap.value)
+        if (energy == 0) {
             // FIXME Not able to reproduce this behavior with TH112XZB
             log.warn 'TH112XZB >> Ignoring energy event (Caused: unknown)'
         } else {
             event.name = 'energy'
-            event.value = newEnergyValue / 1000
+            event.value = energy / 1000
             event.unit = 'kWh'
         }
     } else if (descMap.cluster == '0B04' && descMap.attrId == '050B') {
@@ -296,14 +296,14 @@ void refresh() {
     state.updatedLastRanAt = now()
 
     List cmds = []
-    cmds += zigbee.readAttribute(0x0201, 0x0000)  // Rd thermostat Local temperature
-    cmds += zigbee.readAttribute(0x0201, 0x0012)  // Rd thermostat Occupied heating setpoint
-    cmds += zigbee.readAttribute(0x0201, 0x0008)  // Rd thermostat PI heating demand
-    cmds += zigbee.readAttribute(0x0201, 0x001C)  // Rd thermostat System Mode
-    cmds += zigbee.readAttribute(0x0204, 0x0001)  // Rd thermostat Keypad lock
-    cmds += zigbee.readAttribute(0x0B04, 0x050B)  // Rd thermostat Active power
-    cmds += zigbee.readAttribute(0x0B04, 0x050D)  // Rd thermostat maximum power available
-    cmds += zigbee.readAttribute(0x0702, 0x0000) // Rd thermostat total Energy
+    cmds += zigbee.readAttribute(0x0201, 0x0000) // Local temperature
+    cmds += zigbee.readAttribute(0x0201, 0x0012) // Occupied heating setpoint
+    cmds += zigbee.readAttribute(0x0201, 0x0008) // PI heating demand
+    cmds += zigbee.readAttribute(0x0201, 0x001C) // System Mode
+    cmds += zigbee.readAttribute(0x0204, 0x0001) // Keypad lock
+    cmds += zigbee.readAttribute(0x0B04, 0x050B) // Active power
+    cmds += zigbee.readAttribute(0x0B04, 0x050D) // Maximum power available
+    cmds += zigbee.readAttribute(0x0702, 0x0000) // Total Energy
     sendCommands(cmds)
 }
 
@@ -351,15 +351,14 @@ void setClockTime() {
         log.trace 'TH112XZB >> setClockTime()'
     }
 
-    // Time
+
     /* groovylint-disable-next-line NoJavaUtilDate */
-    Date thermostatDate = new Date()
-    Integer thermostatTimeSec = thermostatDate.getTime() / 1000
-    Integer thermostatTimezoneOffsetSec = thermostatDate.getTimezoneOffset() * 60
-    Integer currentTime = Math.round(thermostatTimeSec - thermostatTimezoneOffsetSec - 946684800)
-
-    cmds += zigbee.writeAttribute(0xFF01, 0x0020, DataType.UINT32, currentTime, [mfgCode: '0x119C'])
-
+    Date now = new Date()
+    Long currentTimeSec = now.getTime() / 1000
+    Integer currentTimezoneOffsetSec = now.getTimezoneOffset() * 60
+    Integer referenceTimeSec = 946684800 // 2000-01-01T00:00:00+00:00
+    Integer currentTimeTSFormat = currentTimeSec - currentTimezoneOffsetSec - referenceTimeSec
+    List cmds = zigbee.writeAttribute(0xFF01, 0x0020, DataType.UINT32, currentTimeTSFormat, [mfgCode: '0x119C'])
     sendCommands(cmds)
 }
 
