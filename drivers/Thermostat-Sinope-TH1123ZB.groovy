@@ -16,7 +16,7 @@ import hubitat.device.HubMultiAction
 metadata
 {
     definition(
-        name: 'TH1123ZB-TH1124ZB Sinope Thermostat',
+        name: 'Sinope Zigbee Thermostat (TH1123ZB-TH1124ZB)',
         namespace: 'fblackburn',
         author: 'fblackburn',
     ) {
