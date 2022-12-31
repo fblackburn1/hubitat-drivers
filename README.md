@@ -1,7 +1,8 @@
 # Hubitat Drivers
 
 This repository contains various Hubitat Elevation drivers.
-My main reason to rewrite custom driver, is to understand and trust every line used by them.
+My main reason to rewrite custom driver, is to understand and trust every line
+used by them.
 
 ## Sinope Thermostat
 
@@ -22,4 +23,5 @@ Official driver doesn't support power consumption
 
 ### Why not using community Hubitat driver?
 
-Available drivers use many scheduler and do logic that, IMHO, shouldn't done inside a driver.
+Available drivers use many scheduler and do logic that, IMHO, shouldn't done
+inside a driver.
