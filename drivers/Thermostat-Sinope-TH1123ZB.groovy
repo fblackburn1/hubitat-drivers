@@ -1,64 +1,24 @@
-/* groovylint-disable DuplicateListLiteral */
-/* groovylint-disable DuplicateMapLiteral */
-/* groovylint-disable DuplicateNumberLiteral */
-/* groovylint-disable EmptyMethod */
-/* groovylint-disable UnnecessaryGetter */
-/* groovylint-disable UnnecessarySetter */
+/* groovylint-disable DuplicateListLiteral, DuplicateMapLiteral, DuplicateNumberLiteral */
+/* groovylint-disable UnnecessaryGetter, UnnecessarySetter */
 /**
  *  Thermostat Sinopé TH1123ZB-TH1124ZB Driver
  *
- *  Version: 0.3
- *  0.1   (2019-12-20) => First release
- *  0.2   (2019-12-21) => Added Lock / Unlock setting / HealthCheck
- *  0.3   (2019-12-22) => Fixed thermostat mode reporting, added thermostat mode setting, added power reporting (?)
- *  Author(0.1-0.3): scoulombe
- *  Date: 2019-12-22
- *
- *  0.4   (2021-12-12) => Added changes from SmartThings driver v1.2.0
- *  0.5   (2021-12-15) => Added possibility to set outdoor temperature from command and fixed power reporting event
- *  0.6   (2022-01-01) => Fixed duplicate events and added event descriptionText attribute
- *  0.7   (2022-01-09) => Added setClockTime command and updated time on "configure" command
- *  0.8   (2022-03-12) => Added enableBacklight and disableBacklight commands
- *  Author(0.4+): fblackburn
+ *  1.0 (2022-12-31): initial release
+ *  Author: fblackburn
+ *  Inspired by:
+ *    - Sinope => https://github.com/SmartThingsCommunity/SmartThingsPublic/tree/master/devicetypes/sinope-technologies
+ *    - scoulombe => https://github.com/scoulombe79/HubitatDrivers/blob/master/Thermostat-Sinope-TH1123ZB.groovy
+ *    - sacua => https://github.com/sacua/SinopeDriverHubitat/blob/main/drivers/SP2600ZB_Sinope_Hubitat.groovy
  */
 
-// Sources:
-/* groovylint-disable-next-line LineLength */
-// * Sinopé => https://github.com/SmartThingsCommunity/SmartThingsPublic/blob/master/devicetypes/sinope-technologies/th1123zb-th1124zb-sinope-thermostat.src/th1123zb-th1124zb-sinope-thermostat.groovy
-// * scoulombe => https://github.com/scoulombe79/HubitatDrivers/blob/master/Thermostat-Sinope-TH1123ZB.groovy
-
-preferences
-{
-    input(
-        'backlightAutoDimParam',
-        'enum',
-        title:'Display backlight',
-        options: ['On Demand', 'Always On (Default)'],
-        multiple: false,
-        required: false,
-    )
-    input(
-        'timeFormatParam',
-        'enum',
-        title:'Clock display format',
-        options:['12 Hour', '24 Hour (Default)'],
-        multiple: false,
-        required: false,
-    )
-    input(
-        'trace',
-        'bool',
-        title: 'Enable debug logging',
-    )
-}
+import hubitat.device.HubMultiAction
 
 metadata
 {
     definition(
-        name: 'TH1123ZB-TH1124ZB Sinope Thermostat',
+        name: 'Sinope Zigbee Thermostat (TH1123ZB-TH1124ZB)',
         namespace: 'fblackburn',
         author: 'fblackburn',
-        ocfDeviceType: 'oic.d.thermostat'
     ) {
         capability 'Configuration'
         capability 'Thermostat'
@@ -67,8 +27,10 @@ metadata
         capability 'ThermostatHeatingSetpoint'
         capability 'ThermostatMode'
         capability 'Lock'
-        capability 'HealthCheck'
         capability 'PowerMeter'
+        capability 'EnergyMeter'
+
+        attribute 'maxPower', 'number'
 
         command(
             'setThermostatMode',
@@ -100,14 +62,15 @@ metadata
         command('enableBacklight')
         command('disableBacklight')
 
-        command 'emergencyHeat', [[name: 'Not Supported']]
-        command 'auto', [[name: 'Not Supported']]
-        command 'cool', [[name: 'Not Supported']]
-        command 'fanCirculate', [[name: 'Not Supported']]
-        command 'fanOn', [[name: 'Not Supported']]
-        command 'fanAuto', [[name: 'Not Supported']]
-        command 'setThermostatFanMode', [[name: 'Not Supported']]
-        command 'setCoolingSetpoint', [[name: 'Not Supported']]
+        List notSupported = [[name: 'Not Supported']]
+        command('emergencyHeat', notSupported)
+        command('auto', notSupported)
+        command('cool', notSupported)
+        command('fanCirculate', notSupported)
+        command('fanOn', notSupported)
+        command('fanAuto', notSupported)
+        command('setThermostatFanMode', notSupported)
+        command('setCoolingSetpoint', notSupported)
 
         fingerprint(
             manufacturer: 'Sinope Technologies',
@@ -117,14 +80,42 @@ metadata
             outClusters: '0019,FF01',
         )
     }
+
+    preferences
+    {
+        input(
+            name: 'backlightAutoDimParam',
+            type: 'enum',
+            title:'Display backlight',
+            options: ['On Demand', 'Always On'],
+            defaultValue: getDefaultBacklight(),
+            multiple: false,
+            required: false,
+        )
+        input(
+            name: 'timeFormatParam',
+            type: 'enum',
+            title:'Clock display format',
+            options:['12 Hour', '24 Hour'],
+            defaultValue: getDefaultTimeFormat(),
+            multiple: false,
+            required: false,
+        )
+        input(
+            name: 'trace',
+            type: 'bool',
+            title: 'Enable debug logging',
+            defaultValue: false
+        )
+    }
 }
 
 void installed() {
     if (settings.trace) {
         log.trace 'TH112XZB >> installed()'
     }
-
-    initialize()
+    refresh_misc()
+    refresh()
 }
 
 void updated() {
@@ -132,18 +123,8 @@ void updated() {
         log.trace 'TH112XZB >> updated()'
     }
 
-    if (!state.updatedLastRanAt || now() >= state.updatedLastRanAt + 1000) {
+    if (!state.updatedLastRanAt || now() >= state.updatedLastRanAt + 2000) {
         state.updatedLastRanAt = now()
-
-        if (settings.trace) {
-            log.trace 'TH112XZB >> updated() => Device is now updated'
-        }
-
-        try {
-            unschedule()
-        }
-        catch (ignored) { }
-
         refresh_misc()
     }
 }
@@ -153,110 +134,112 @@ void configure() {
         log.trace 'TH112XZB >> configure()'
     }
 
-    // Configure reporting ...
-    List cmds = []
-    cmds += zigbee.configureReporting(0x0201, 0x0000, DataType.INT16, 19, 301, 50)      // local temperature
-    cmds += zigbee.configureReporting(0x0201, 0x0008, DataType.UINT8, 4, 300, 10)       // heating demand
-    cmds += zigbee.configureReporting(0x0201, 0x0012, DataType.INT16, 15, 302, 40)      // occupied heating setpoint
-    // FIXME: Doesn't seem to work
-    cmds += zigbee.configureReporting(0x0B04, 0x050B, DataType.INT16, 30, 599, 0x64)    // active power
-
-    sendCommands(cmds)
-
-    // Allow 5 min without receiving temperature report
-    sendEvent(
-        name: 'checkInterval',
-        value: 300,
-        displayed: false,
-        data: [protocol: 'zigbee', hubHardwareId: device.hub.hardwareID],
-    )
-
-    refresh_misc()
-}
-
-void initialize() {
-    if (settings.trace) {
-        log.trace 'TH112XZB >> initialize()'
-    }
-
-    refresh_misc()
-    refresh()
-}
-
-void ping() {
-    List cmds = []
-    cmds += zigbee.readAttribute(0x0201, 0x0000) // temperature
-    sendCommands(cmds)
-}
-
-void uninstalled() {
     try {
         unschedule()
     }
     catch (ignored) { }
+
+    List cmds = []
+    cmds += zigbee.configureReporting(0x0201, 0x0000, DataType.INT16, 19, 301, 50)    // Temperature
+    cmds += zigbee.configureReporting(0x0201, 0x0008, DataType.UINT8, 4, 300, 10)     // Heating (%)
+    cmds += zigbee.configureReporting(0x0201, 0x0012, DataType.INT16, 15, 302, 40)    // Heating Setpoint (°)
+    // Since energyValue will only increase with time, we can only use minReportTime (300)
+    cmds += zigbee.configureReporting(0x0702, 0x0000, DataType.UINT48, 300, 1800, 50) // Energy (Wh)
+
+    runEvery3Hours('handlePowerOutage')
+
+    sendCommands(cmds)
+    refresh_misc()
+}
+
+void uninstalled() {
+    if (settings.trace) {
+        log.trace 'TH112XZB >> uninstalled()'
+    }
+    unschedule()
 }
 
 Map parse(String description) {
     if (!description?.startsWith('read attr -')) {
         if (!description?.startsWith('catchall:')) {
-            log.trace 'TH112XZB >> parse(description) ==> ' + description
+            log.warn "TH112XZB >> parse(description) ==> Unhandled event: ${description}"
         }
         return [:]
     }
 
     Map event = [:]
-    String scale = getTemperatureScale()
     Map descMap = zigbee.parseDescriptionAsMap(description)
-    state?.scale = scale
-
     if (descMap.cluster == '0201' && descMap.attrId == '0000') {
+        String scale = getTemperatureScale()
         event.name = 'temperature'
-        event.value = getTemperatureValue(descMap.value)
-        event.unit = '°' + scale
-        //allow 5 min without receiving temperature report
-        Map data = [protocol: 'zigbee', hubHardwareId: device.getHub().hardwareID]
-        sendEvent(name: 'checkInterval', value: 300, displayed: false, data: data)
-    }
-    else if (descMap.cluster == '0201' && descMap.attrId == '0008') {
+        event.value = getTemperatureValue(descMap.value, scale)
+        event.unit = "°${scale}"
+    } else if (descMap.cluster == '0201' && descMap.attrId == '0008') {
+        Integer heatingDemand = getHeatingDemand(descMap.value)
         event.name = 'heatingDemand'
-        event.value = getHeatingDemand(descMap.value)
+        event.value = heatingDemand
         event.unit = '%'
+
         String operatingState = (event.value.toInteger() < 10) ? 'idle' : 'heating'
-        Map subEvent = ['name': 'thermostatOperatingState', 'value': operatingState]
-        subEvent.descriptionText = device.getLabel() + ' ' + subEvent.name + ' is ' + subEvent.value
-        sendEvent(subEvent)
-        runIn(1, requestPower)
-    }
-    else if (descMap.cluster == '0B04' && descMap.attrId == '050B') {
+        Map opEvent = ['name': 'thermostatOperatingState', 'value': operatingState]
+        opEvent.descriptionText = generateDescription(opEvent)
+        if (settings.trace) {
+            log.trace "TH112XZB >> parse(description)[generated] ==> ${opEvent.name}: ${opEvent.value}"
+        }
+        sendEvent(opEvent)
+
+        Integer maxPower = device.currentValue('maxPower')
+        if (maxPower != null) {
+            Integer power = Math.round(maxPower * heatingDemand / 100)
+            Map powerEvent = [name: 'power', value: power, unit: 'W']
+            powerEvent.descriptionText = generateDescription(powerEvent)
+            if (settings.trace) {
+                log.trace "TH112XZB >> parse(description)[generated] ==> ${powerEvent.name}: ${powerEvent.value}"
+            }
+            sendEvent(powerEvent)
+        }
+    } else if (descMap.cluster == '0702' && descMap.attrId == '0000') {
+        BigInteger energy = getEnergy(descMap.value)
+        if (energy == 0) {
+            // FIXME Not able to reproduce this behavior with TH112XZB
+            log.warn 'TH112XZB >> Ignoring energy event (Caused: unknown)'
+        } else {
+            event.name = 'energy'
+            event.value = energy / 1000
+            event.unit = 'kWh'
+        }
+    } else if (descMap.cluster == '0B04' && descMap.attrId == '050B') {
         event.name = 'power'
-        event.value = getActivePower(descMap.value)
+        event.value = getPower(descMap.value)
         event.unit = 'W'
-    }
-    else if (descMap.cluster == '0201' && descMap.attrId == '0012') {
+    } else if (descMap.cluster == '0B04' && descMap.attrId == '050D') {
+        event.name = 'maxPower'
+        event.value = getPower(descMap.value)
+        event.unit = 'W'
+    } else if (descMap.cluster == '0201' && descMap.attrId == '0012') {
+        String scale = getTemperatureScale()
         event.name = 'heatingSetpoint'
-        event.value = getTemperatureValue(descMap.value, true)
-        event.unit = '°' + scale
-    }
-    else if (descMap.cluster == '0201' && descMap.attrId == '0014') {
+        event.value = getTemperatureValue(descMap.value, scale, true)
+        event.unit = "°${scale}"
+    } else if (descMap.cluster == '0201' && descMap.attrId == '0014') {
+        String scale = getTemperatureScale()
         event.name = 'heatingSetpoint'
-        event.value = getTemperatureValue(descMap.value, true)
-        event.unit = '°' + scale
-    }
-    else if (descMap.cluster == '0201' && descMap.attrId == '001C') {
+        event.value = getTemperatureValue(descMap.value, scale, true)
+        event.unit = "°${scale}"
+    } else if (descMap.cluster == '0201' && descMap.attrId == '001C') {
         event.name = 'thermostatMode'
         event.value = getModeMap()[descMap.value]
-    }
-    else if (descMap.cluster == '0204' && descMap.attrId == '0001') {
+    } else if (descMap.cluster == '0204' && descMap.attrId == '0001') {
         event.name = 'lock'
         event.value = getLockMap()[descMap.value]
+    } else {
+        log.warn "TH112XZB >> parse(descMap) ==> Unhandled attribute: ${descMap}"
+        return [:]
     }
-    else {
-        log.trace 'TH112XZB >> parse(descMap) ==> ' + descMap
-    }
+    event.descriptionText = generateDescription(event)
 
-    event.descriptionText = device.getLabel() + ' ' + event.name + ' is ' + event.value
-    if (event.unit) {
-        event.descriptionText = event.descriptionText + event.unit
+    if (settings.trace) {
+        log.trace "TH112XZB >> parse(description) ==> ${event.name}: ${event.value}"
     }
     return event
 }
@@ -266,11 +249,10 @@ void unlock() {
         log.trace 'TH112XZB >> unlock()'
     }
     Map event = ['name': 'lock', 'value': 'unlocked']
-    event.descriptionText = device.getLabel() + ' ' + event.name + ' is ' + event.value
+    event.descriptionText = "${device.getLabel()} ${event.name} is ${event.value}"
     sendEvent(event)
 
-    List cmds = []
-    cmds += zigbee.writeAttribute(0x0204, 0x0001, DataType.ENUM8, 0x00)
+    List cmds = zigbee.writeAttribute(0x0204, 0x0001, DataType.ENUM8, 0x00)
     sendCommands(cmds)
 }
 
@@ -279,11 +261,10 @@ void lock() {
         log.trace 'TH112XZB >> lock()'
     }
     Map event = ['name': 'lock', 'value': 'locked']
-    event.descriptionText = device.getLabel() + ' ' + event.name + ' is ' + event.value
+    event.descriptionText = "${device.getLabel()} ${event.name} is ${event.value}"
     sendEvent(event)
 
-    List cmds = []
-    cmds += zigbee.writeAttribute(0x0204, 0x0001, DataType.ENUM8, 0x01)
+    List cmds = zigbee.writeAttribute(0x0204, 0x0001, DataType.ENUM8, 0x01)
     sendCommands(cmds)
 }
 
@@ -291,26 +272,30 @@ void refresh() {
     if (settings.trace) {
         log.trace 'TH112XZB >> refresh()'
     }
-
     if (state.updatedLastRanAt && now() < state.updatedLastRanAt + 5000) {
         if (settings.trace) {
-            log.trace 'TH112XZB >> refresh() --- Ran within last 5 seconds so aborting'
+            log.trace 'TH112XZB >> refresh() ==> Ran within last 5 seconds so aborting'
         }
         return
     }
     state.updatedLastRanAt = now()
 
     List cmds = []
-    cmds += zigbee.readAttribute(0x0201, 0x0000)  // Rd thermostat Local temperature
-    cmds += zigbee.readAttribute(0x0201, 0x0012)  // Rd thermostat Occupied heating setpoint
-    cmds += zigbee.readAttribute(0x0201, 0x0008)  // Rd thermostat PI heating demand
-    cmds += zigbee.readAttribute(0x0201, 0x001C)  // Rd thermostat System Mode
-    cmds += zigbee.readAttribute(0x0204, 0x0001)  // Rd thermostat Keypad lock
-    cmds += zigbee.readAttribute(0x0B04, 0x050B)  // Rd thermostat Active power
+    cmds += zigbee.readAttribute(0x0201, 0x0000) // Local temperature
+    cmds += zigbee.readAttribute(0x0201, 0x0012) // Occupied heating setpoint
+    cmds += zigbee.readAttribute(0x0201, 0x0008) // PI heating demand
+    cmds += zigbee.readAttribute(0x0201, 0x001C) // System Mode
+    cmds += zigbee.readAttribute(0x0204, 0x0001) // Keypad lock
+    cmds += zigbee.readAttribute(0x0B04, 0x050B) // Active power
+    cmds += zigbee.readAttribute(0x0B04, 0x050D) // Maximum power available
+    cmds += zigbee.readAttribute(0x0702, 0x0000) // Total Energy
     sendCommands(cmds)
 }
 
 void setOutdoorTemperature(Double outdoorTemp) {
+    if (settings.trace) {
+        log.trace "TH112XZB >> setOutdoorTemperature(${outdoorTemp})"
+    }
     state.outdoorTemperature = outdoorTemp
     if (state.displayTemperature == 'Setpoint') {
         return
@@ -319,122 +304,93 @@ void setOutdoorTemperature(Double outdoorTemp) {
 }
 
 void displayTemperature(String choice) {
+    if (settings.trace) {
+        log.trace "TH112XZB >> displayTemperature(${choice})"
+    }
     if (state.outdoorTemperature && choice == 'Outdoor') {
         sendOutdoorTemperature(state.outdoorTemperature)
-    }
-    else {
+    } else {
         sendSetpointTemperature()
     }
     state.displayTemperature = choice
 }
 
 void enableBacklight() {
-    List cmds = []
-    cmds += zigbee.writeAttribute(0x0201, 0x0402, DataType.ENUM8, 0x0001)
+    if (settings.trace) {
+        log.trace 'TH112XZB >> enableBacklight()'
+    }
+    List cmds = zigbee.writeAttribute(0x0201, 0x0402, DataType.ENUM8, 0x0001)
     sendCommands(cmds)
 }
 
 void disableBacklight() {
-    List cmds = []
-    cmds += zigbee.writeAttribute(0x0201, 0x0402, DataType.ENUM8, 0x0000)
+    if (settings.trace) {
+        log.trace 'TH112XZB >> disableBacklight()'
+    }
+    List cmds = zigbee.writeAttribute(0x0201, 0x0402, DataType.ENUM8, 0x0000)
     sendCommands(cmds)
 }
 
 void setClockTime() {
-    List cmds = []
-    // Time Format
-    if (settings.timeFormatParam == '12 Hour') {
-        // 12 Hour
-        cmds += zigbee.writeAttribute(0xFF01, 0x0114, 0x30, 0x0001)
-    }
-    else {
-        // 24 Hour
-        cmds += zigbee.writeAttribute(0xFF01, 0x0114, 0x30, 0x0000)
+    if (settings.trace) {
+        log.trace 'TH112XZB >> setClockTime()'
     }
 
-    // Time
+
     /* groovylint-disable-next-line NoJavaUtilDate */
-    Date thermostatDate = new Date()
-    Integer thermostatTimeSec = thermostatDate.getTime() / 1000
-    Integer thermostatTimezoneOffsetSec = thermostatDate.getTimezoneOffset() * 60
-    Integer currentTimeToDisplay = Math.round(thermostatTimeSec - thermostatTimezoneOffsetSec - 946684800)
-
-    Integer currentTimeToSend = zigbee.convertHexToInt(hex(currentTimeToDisplay))
-    cmds += zigbee.writeAttribute(0xFF01, 0x0020, DataType.UINT32, currentTimeToSend, [mfgCode: '0x119C'])
-
+    Date now = new Date()
+    Long currentTimeSec = now.getTime() / 1000
+    Integer currentTimezoneOffsetSec = now.getTimezoneOffset() * 60
+    Integer referenceTimeSec = 946684800 // 2000-01-01T00:00:00+00:00
+    Integer currentTimeTSFormat = currentTimeSec - currentTimezoneOffsetSec - referenceTimeSec
+    List cmds = zigbee.writeAttribute(0xFF01, 0x0020, DataType.UINT32, currentTimeTSFormat, [mfgCode: '0x119C'])
     sendCommands(cmds)
-}
-
-void refresh_misc() {
-    List cmds = []
-
-    // °C or °F
-    if (state?.scale == 'C') {
-        cmds += zigbee.writeAttribute(0x0204, 0x0000, DataType.ENUM8, 0)  // °C on thermostat display
-    }
-    else {
-        cmds += zigbee.writeAttribute(0x0204, 0x0000, DataType.ENUM8, 1)  // °F on thermostat display
-    }
-
-    sendCommands(cmds)
-    setClockTime()
-
-    // Backlight
-    if (settings.backlightAutoDimParam == 'On Demand') {
-        disableBacklight()
-    }
-    else {
-        enableBacklight()
-    }
 }
 
 void setHeatingSetpoint(Double degrees) {
+    if (settings.trace) {
+        log.trace "TH112XZB >> setHeatingSetpoint(${degrees})"
+    }
     String scale = getTemperatureScale()
-    Double degreesScoped = checkTemperature(degrees)
-    Double degreesDouble = degreesScoped as Double
-    String tempValueString
-
-    if (scale == 'C') {
-        tempValueString = String.format('%2.1f', degreesDouble)
-    }
-    else {
-        tempValueString = String.format('%2d', degreesDouble.intValue())
-    }
-    Map event = ['name': 'heatingSetpoint', 'value': tempValueString, 'unit': '°' + scale]
-    event.descriptionText = device.getLabel() + ' ' + event.name + ' is ' + event.value + event.unit
-    sendEvent(event)
-
-    Double celsius = (scale == 'C') ? degreesDouble : (fahrenheitToCelsius(degreesDouble) as Double).round(1)
+    Double degreesScoped = checkTemperature(degrees, scale)
+    Double celsius = (scale == 'C') ? degreesScoped : fahrenheitToCelsius(degreesScoped).round(1)
+    Integer celsiusRound = Math.round(celsius * 100)
 
     List cmds = []
-    cmds += zigbee.writeAttribute(0x0201, 0x0012, DataType.INT16,  zigbee.convertHexToInt(hex(celsius * 100)))
+    cmds += zigbee.writeAttribute(0x0201, 0x0012, DataType.INT16, celsiusRound)
     cmds += zigbee.readAttribute(0x0201, 0x0012)
     sendCommands(cmds)
 }
 
 void off() {
+    if (settings.trace) {
+        log.trace 'TH112XZB >> off()'
+    }
     setThermostatMode('off')
 }
 
 void heat() {
+    if (settings.trace) {
+        log.trace 'TH112XZB >> heat()'
+    }
     setThermostatMode('heat')
 }
 
-void cool() { }
+void cool() { return }
 
-void auto() { }
+void auto() { return }
 
-void emergencyHeat() { }
+void emergencyHeat() { return }
 
-void setCoolingSetpoint() { }
+void setCoolingSetpoint() { return }
 
-void fanCirculate() { }
+void fanCirculate() { return }
 
-void fanOn() { }
+void fanOn() { return }
 
-void fanAuto() { }
+void fanAuto() { return }
 
-void setThermostatFanMode() { }
+void setThermostatFanMode() { return }
 
 List<String> getSupportedThermostatModes() {
     return ['heat', 'off']
@@ -459,7 +415,7 @@ void mode_off() {
     }
 
     List cmds = []
-    cmds += zigbee.writeAttribute(0x0201, 0x001C, 0x30, 0)
+    cmds += zigbee.writeAttribute(0x0201, 0x001C, DataType.ENUM8, 0)
     cmds += zigbee.readAttribute(0x0201, 0x001C)
     sendCommands(cmds)
 }
@@ -470,106 +426,139 @@ void mode_heat() {
     }
 
     List cmds = []
-    cmds += zigbee.writeAttribute(0x0201, 0x001C, 0x30, 4)
+    cmds += zigbee.writeAttribute(0x0201, 0x001C, DataType.ENUM8, 4)
     cmds += zigbee.readAttribute(0x0201, 0x001C)
     sendCommands(cmds)
 }
 
 // Cannot be private to be executed by runIn
-void requestPower() {
-    List cmds = []
-    cmds += zigbee.readAttribute(0x0B04, 0x050B)
+void handlePowerOutage() {
+    // Maximum power can change with time (i.e. after a power outage)
+    List cmds = zigbee.readAttribute(0x0B04, 0x050D) // Maximum power available
     sendCommands(cmds)
+    // Clock can be desynced with time (i.e. after a power outage or summer time)
+    setClockTime()
+}
+
+private String generateDescription(Map event){
+    String description = null
+    if (event.name && event.value) {
+        description = "${device.getLabel()} ${event.name} is ${event.value}"
+        if (event.unit) {
+            return "${event.descriptionText}${event.unit}"
+        }
+    }
+    return description
+}
+
+private void refresh_misc() {
+    List cmds = []
+
+    // °C or °F
+    String scale = getTemperatureScale()
+    if (scale == 'C') {
+        cmds += zigbee.writeAttribute(0x0204, 0x0000, DataType.ENUM8, 0)  // °C
+    } else {
+        cmds += zigbee.writeAttribute(0x0204, 0x0000, DataType.ENUM8, 1)  // °F
+    }
+
+    String timeFormat = settings.timeFormatParam == null ? getDefaultTimeFormat() : settings.timeFormatParam
+    if (timeFormat == '12 Hour') {
+        cmds += zigbee.writeAttribute(0xFF01, 0x0114, DataType.ENUM8, 0x0001) // 12 Hour
+    } else {
+        cmds += zigbee.writeAttribute(0xFF01, 0x0114, DataType.ENUM8, 0x0000) // 24 Hour
+    }
+
+    sendCommands(cmds)
+    setClockTime()
+
+    String backlight = settings.backlightAutoDimParam == null ? getDefaultBacklight() : settings.backlightAutoDimParam
+    if (backlight == 'On Demand') {
+        disableBacklight()
+    } else {
+        enableBacklight()
+    }
 }
 
 private void sendOutdoorTemperature(Double outdoorTemp) {
     List cmds = []
     Integer timeout = 3 * 60 * 60 // 3 hours
-    Integer outdoorTempHex = zigbee.convertHexToInt(hex(outdoorTemp * 100))
+    Integer outdoorTempInt = Math.round(outdoorTemp * 100)
     cmds += zigbee.writeAttribute(0xFF01, 0x0011, DataType.UINT16, timeout, [:], 1000)
-    cmds += zigbee.writeAttribute(0xFF01, 0x0010, DataType.INT16, outdoorTempHex, [mfgCode: '0x119C'], 1000)
+    cmds += zigbee.writeAttribute(0xFF01, 0x0010, DataType.INT16, outdoorTempInt, [mfgCode: '0x119C'], 1000)
     sendCommands(cmds)
 }
 
 private void sendSetpointTemperature() {
-    List cmds = []
-    cmds += zigbee.writeAttribute(0xFF01, 0x0010, DataType.INT16, 0x8000)
+    List cmds = zigbee.writeAttribute(0xFF01, 0x0010, DataType.INT16, 0x8000)
     sendCommands(cmds)
 }
 
-private Double checkTemperature(Double temperature) {
-    String scale = getTemperatureScale()
+private Double checkTemperature(Double temperature, String scale) {
     Double number = temperature
     Integer maxCelcius = 25
 
     if (scale == 'F') {
         if (number < 41) {
             number = 41
-        }
-        else if (number > 86) {
+        } else if (number > 86) {
             number = 86
         }
-    }
-    else { //scale == 'C'
+    } else { //scale == 'C'
         if (number < 5) {
             number = 5
-        }
-        else if (number > maxCelcius) {
+        } else if (number > maxCelcius) {
             number = maxCelcius
         }
     }
-
     return number
 }
 
-private Double getTemperatureValue(String value, Boolean doRounding = false) {
-    String scale = state?.scale
+private Double getTemperatureValue(String value, String scale, Boolean doRounding = false) {
+    if (value == null) {
+        return
+    }
 
-    if (value != null) {
-        Double celsius = (Integer.parseInt(value, 16) / 100).toDouble()
+    Double celsius = (Integer.parseInt(value, 16) / 100).toDouble()
+    if (scale == 'C') {
+        if (doRounding) {
+            String tempValueString = String.format('%2.1f', celsius)
 
-        if (scale == 'C') {
-            if (doRounding) {
-                String tempValueString = String.format('%2.1f', celsius)
-
-                if (tempValueString.matches('.*([.,][456])')) {
-                    tempValueString = String.format('%2d.5', celsius.intValue())
-                }
-
-                else if (tempValueString.matches('.*([.,][789])')) {
-                    celsius = celsius.intValue() + 1
-                    tempValueString = String.format('%2d.0', celsius.intValue())
-                }
-                else {
-                    tempValueString = String.format('%2d.0', celsius.intValue())
-                }
-
-                return tempValueString.toDouble().round(1)
+            if (tempValueString.matches('.*([.,][456])')) {
+                tempValueString = String.format('%2d.5', celsius.intValue())
+            } else if (tempValueString.matches('.*([.,][789])')) {
+                celsius = celsius.intValue() + 1
+                tempValueString = String.format('%2d.0', celsius.intValue())
+            } else {
+                tempValueString = String.format('%2d.0', celsius.intValue())
             }
-            return celsius.round(1)
+
+            return tempValueString.toDouble().round(1)
         }
-        return Math.round(celsiusToFahrenheit(celsius))
+        return celsius.round(1)
     }
+    return Math.round(celsiusToFahrenheit(celsius))
 }
 
-private String hex(Double value) {
-    return new BigInteger(Math.round(value).toString()).toString(16)
-}
-
-private String getHeatingDemand(String value) {
+private Integer getHeatingDemand(String value) {
     if (value == null) {
         return
     }
-    Integer demand = Integer.parseInt(value, 16)
-    return demand.toString()
+    return Integer.parseInt(value, 16)
 }
 
-private Integer getActivePower(String value) {
+private Integer getPower(String value) {
     if (value == null) {
         return
     }
-    Integer activePower = Integer.parseInt(value, 16)
-    return activePower
+    return Integer.parseInt(value, 16)
+}
+
+private BigInteger getEnergy(String value) {
+    if (value == null) {
+        return 0
+    }
+    return new BigInteger(value, 16)
 }
 
 private Map getModeMap() {
@@ -586,16 +575,14 @@ private Map getLockMap() {
     ]
 }
 
-private void sendCommands(List commands) {
-    if (commands != null && commands.size() > 0) {
-        if (settings.trace) {
-            log.trace('Executing commands:' + commands)
-        }
+private String getDefaultBacklight() {
+    return 'Always On'
+}
 
-        for (String value : commands) {
-            sendHubCommand([value].collect {
-                command -> new hubitat.device.HubAction(command, hubitat.device.Protocol.ZIGBEE)
-            })
-        }
-    }
+private String getDefaultTimeFormat() {
+    return '24 Hour'
+}
+private void sendCommands(List<Map> commands) {
+    HubMultiAction actions = new HubMultiAction(commands, hubitat.device.Protocol.ZIGBEE)
+    sendHubCommand(actions)
 }
