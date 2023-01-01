@@ -106,7 +106,7 @@ Map parse(String description) {
         event.value = getSwitchMap()[descMap.value]
     } else if (descMap.cluster == '0B04' && descMap.attrId == '050B') {
         event.name = 'power'
-        event.value = getActivePower(descMap.value)
+        event.value = getPower(descMap.value)
         event.unit = 'W'
     } else if (descMap.cluster == '0702' && descMap.attrId == '0000') {
         BigInteger newEnergyValue = getEnergy(descMap.value)
@@ -228,11 +228,11 @@ private Map getSwitchMap() {
     ]
 }
 
-private Integer getActivePower(String value) {
+private Double getPower(String value) {
     if (value == null) {
         return
     }
-    return Integer.parseInt(value, 16)
+    return Integer.parseInt(value, 16) / 10
 }
 
 private BigInteger getEnergy(String value) {
