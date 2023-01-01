@@ -440,12 +440,12 @@ void handlePowerOutage() {
     setClockTime()
 }
 
-private String generateDescription(Map event){
+private String generateDescription(Map event) {
     String description = null
     if (event.name && event.value) {
         description = "${device.getLabel()} ${event.name} is ${event.value}"
         if (event.unit) {
-            return "${event.descriptionText}${event.unit}"
+            description = "${description}${event.unit}"
         }
     }
     return description
