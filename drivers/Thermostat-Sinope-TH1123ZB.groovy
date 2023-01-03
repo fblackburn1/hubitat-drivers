@@ -200,14 +200,19 @@ Map parse(String description) {
         }
     } else if (descMap.cluster == '0702' && descMap.attrId == '0000') {
         BigInteger energy = getEnergy(descMap.value)
-        if (energy == 0) {
-            // FIXME Not able to reproduce this behavior with TH112XZB
-            log.warn 'TH112XZB >> Ignoring energy event (Caused: unknown)'
-        } else {
-            event.name = 'energy'
-            event.value = energy / 1000
-            event.unit = 'kWh'
+        Double previousEnergy = device.currentValue('energy')
+        if (energy < previousEnergy) {
+            // When a baseboard heater is too hot, a short circuit is created for few seconds until the unit cools down.
+            // This kind of power outage, reset to an old "random" value
+            // Note: For some unknown reason, power outage from electrical board doesn't reset value ...
+            // If you have this warning you should verify that nothing prevents the release of heat from your heater
+            // (ex: curtains, bedding, reverse installation, etc)
+            /* groovylint-disable-next-line LineLength */
+            log.warn "TH112XZB >> Energy[${energy}] is lower than previous one[${previousEnergy}] (Caused: short circuit from heater)"
         }
+        event.name = 'energy'
+        event.value = energy / 1000
+        event.unit = 'kWh'
     } else if (descMap.cluster == '0B04' && descMap.attrId == '050B') {
         event.name = 'power'
         event.value = getPower(descMap.value)
@@ -335,7 +340,6 @@ void setClockTime() {
     if (settings.trace) {
         log.trace 'TH112XZB >> setClockTime()'
     }
-
 
     /* groovylint-disable-next-line NoJavaUtilDate */
     Date now = new Date()
