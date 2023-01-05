@@ -159,7 +159,7 @@ void uninstalled() {
     unschedule()
 }
 
-Map parse(String description) {
+List<Map> parse(String description) {
     if (!description?.startsWith('read attr -')) {
         if (!description?.startsWith('catchall:')) {
             log.warn "TH112XZB >> parse(description) ==> Unhandled event: ${description}"
@@ -167,8 +167,20 @@ Map parse(String description) {
         return [:]
     }
 
-    Map event = [:]
     Map descMap = zigbee.parseDescriptionAsMap(description)
+    List<Map> events = [parseMap(descMap)]
+    if (descMap.additionalAttrs) {
+        // From test, only (cluster: 0B04 / attrId: 0505) has additionalAttrs
+        descMap.additionalAttrs.each { attribute ->
+            attribute.cluster = attribute.cluster ? attribute.cluster : descMap.cluster
+            events += parseMap(attribute)
+        }
+    }
+    return parseMap(descMap)
+}
+
+private List<Map> parseMap(Map descMap) {
+    Map event = [:]
     if (descMap.cluster == '0201' && descMap.attrId == '0000') {
         String scale = getTemperatureScale()
         event.name = 'temperature'
@@ -237,6 +249,19 @@ Map parse(String description) {
     } else if (descMap.cluster == '0204' && descMap.attrId == '0001') {
         event.name = 'lock'
         event.value = getLockMap()[descMap.value]
+    } else if (descMap.cluster == '0B04' && descMap.attrId == '0505') {
+        // This event seems to be triggered automatically after each 18 hours
+        event.name = 'rmsVoltage'
+        event.value = getVoltage(descMap.value)
+        event.unit = 'V'
+    } else if (descMap.cluster == '0B04' && descMap.attrId == '0508') {
+        event.name = 'rmsCurrent'
+        event.value = getCurrent(attribute.value)
+        event.unit = 'A'
+    } else if (descMap.cluster == '0B04' && descMap.attrId == '0551') {
+        BigInteger energy = getEnergy(descMap.value)
+        log.trace "TH112XZB >> Skipping duplicate event[0551] energy': ${energy}"
+        return [:]
     } else {
         log.warn "TH112XZB >> parse(descMap) ==> Unhandled attribute: ${descMap}"
         return [:]
@@ -563,6 +588,20 @@ private BigInteger getEnergy(String value) {
         return 0
     }
     return new BigInteger(value, 16)
+}
+
+private Double getVoltage(String value) {
+    if (value == null) {
+        return 0
+    }
+    return Integer.parseInt(value, 16) / 10
+}
+
+private Double getCurrent(String value) {
+    if (value == null) {
+        return 0
+    }
+    return Integer.parseInt(value, 16) / 1000
 }
 
 private Map getModeMap() {
