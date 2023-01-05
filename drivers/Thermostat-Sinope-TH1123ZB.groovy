@@ -32,6 +32,8 @@ metadata
         capability 'EnergyMeter'
 
         attribute 'maxPower', 'number'
+        attribute 'rmsVoltage', 'number'
+        attribute 'rmsCurrent', 'number'
 
         command(
             'setThermostatMode',
@@ -165,19 +167,19 @@ List<Map> parse(String description) {
         if (!description?.startsWith('catchall:')) {
             log.warn "TH112XZB >> parse(description) ==> Unhandled event: ${description}"
         }
-        return [:]
+        return []
     }
 
     Map descMap = zigbee.parseDescriptionAsMap(description)
-    List<Map> events = [parseMap(descMap)]
+    List<Map> events = [generateEvent(descMap)]
     if (descMap.additionalAttrs) {
         // From test, only (cluster: 0B04 / attrId: 0505) has additionalAttrs
         descMap.additionalAttrs.each { attribute ->
             attribute.cluster = attribute.cluster ? attribute.cluster : descMap.cluster
-            events += parseMap(attribute)
+            events += generateEvent(attribute)
         }
     }
-    return parseMap(descMap)
+    return events
 }
 
 void unlock() {
@@ -375,7 +377,7 @@ void handlePowerOutage() {
     setClockTime()
 }
 
-private List<Map> parseMap(Map descMap) {
+private Map generateEvent(Map descMap) {
     Map event = [:]
     if (descMap.cluster == '0201' && descMap.attrId == '0000') {
         String scale = getTemperatureScale()
@@ -452,11 +454,13 @@ private List<Map> parseMap(Map descMap) {
         event.unit = 'V'
     } else if (descMap.cluster == '0B04' && descMap.attrId == '0508') {
         event.name = 'rmsCurrent'
-        event.value = getCurrent(attribute.value)
+        event.value = getCurrent(descMap.value)
         event.unit = 'A'
     } else if (descMap.cluster == '0B04' && descMap.attrId == '0551') {
-        BigInteger energy = getEnergy(descMap.value)
-        log.trace "TH112XZB >> Skipping duplicate event[0551] energy': ${energy}"
+        if (settings.trace) {
+            BigInteger energy = getEnergy(descMap.value)
+            log.trace "TH112XZB >> Skipping duplicate event[0551] energy: ${energy}"
+        }
         return [:]
     } else {
         log.warn "TH112XZB >> parse(descMap) ==> Unhandled attribute: ${descMap}"
