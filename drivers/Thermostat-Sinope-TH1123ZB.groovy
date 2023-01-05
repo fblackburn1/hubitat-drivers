@@ -179,101 +179,6 @@ List<Map> parse(String description) {
     return parseMap(descMap)
 }
 
-private List<Map> parseMap(Map descMap) {
-    Map event = [:]
-    if (descMap.cluster == '0201' && descMap.attrId == '0000') {
-        String scale = getTemperatureScale()
-        event.name = 'temperature'
-        event.value = getTemperatureValue(descMap.value, scale)
-        event.unit = "°${scale}"
-    } else if (descMap.cluster == '0201' && descMap.attrId == '0008') {
-        Integer heatingDemand = getHeatingDemand(descMap.value)
-        event.name = 'heatingDemand'
-        event.value = heatingDemand
-        event.unit = '%'
-
-        String operatingState = (event.value.toInteger() < 10) ? 'idle' : 'heating'
-        Map opEvent = ['name': 'thermostatOperatingState', 'value': operatingState]
-        opEvent.descriptionText = generateDescription(opEvent)
-        if (settings.trace) {
-            log.trace "TH112XZB >> parse(description)[generated] ==> ${opEvent.name}: ${opEvent.value}"
-        }
-        sendEvent(opEvent)
-
-        Integer maxPower = device.currentValue('maxPower')
-        if (maxPower != null) {
-            Integer power = Math.round(maxPower * heatingDemand / 100)
-            Map powerEvent = [name: 'power', value: power, unit: 'W']
-            powerEvent.descriptionText = generateDescription(powerEvent)
-            if (settings.trace) {
-                log.trace "TH112XZB >> parse(description)[generated] ==> ${powerEvent.name}: ${powerEvent.value}"
-            }
-            sendEvent(powerEvent)
-        }
-    } else if (descMap.cluster == '0702' && descMap.attrId == '0000') {
-        BigInteger energy = getEnergy(descMap.value)
-        Double previousEnergy = device.currentValue('energy')
-        if (energy < previousEnergy) {
-            // When a baseboard heater is too hot, a short circuit is created for few seconds until the unit cools down.
-            // This kind of power outage, reset to an old "random" value
-            // Note: For some unknown reason, power outage from electrical board doesn't reset value ...
-            // If you have this warning you should verify that nothing prevents the release of heat from your heater
-            // (ex: curtains, bedding, reverse installation, etc)
-            /* groovylint-disable-next-line LineLength */
-            log.warn "TH112XZB >> Energy[${energy}] is lower than previous one[${previousEnergy}] (Caused: short circuit from heater)"
-        }
-        event.name = 'energy'
-        event.value = energy / 1000
-        event.unit = 'kWh'
-    } else if (descMap.cluster == '0B04' && descMap.attrId == '050B') {
-        event.name = 'power'
-        event.value = getPower(descMap.value)
-        event.unit = 'W'
-    } else if (descMap.cluster == '0B04' && descMap.attrId == '050D') {
-        event.name = 'maxPower'
-        event.value = getPower(descMap.value)
-        event.unit = 'W'
-    } else if (descMap.cluster == '0201' && descMap.attrId == '0012') {
-        String scale = getTemperatureScale()
-        event.name = 'heatingSetpoint'
-        event.value = getTemperatureValue(descMap.value, scale, true)
-        event.unit = "°${scale}"
-    } else if (descMap.cluster == '0201' && descMap.attrId == '0014') {
-        String scale = getTemperatureScale()
-        event.name = 'heatingSetpoint'
-        event.value = getTemperatureValue(descMap.value, scale, true)
-        event.unit = "°${scale}"
-    } else if (descMap.cluster == '0201' && descMap.attrId == '001C') {
-        event.name = 'thermostatMode'
-        event.value = getModeMap()[descMap.value]
-    } else if (descMap.cluster == '0204' && descMap.attrId == '0001') {
-        event.name = 'lock'
-        event.value = getLockMap()[descMap.value]
-    } else if (descMap.cluster == '0B04' && descMap.attrId == '0505') {
-        // This event seems to be triggered automatically after each 18 hours
-        event.name = 'rmsVoltage'
-        event.value = getVoltage(descMap.value)
-        event.unit = 'V'
-    } else if (descMap.cluster == '0B04' && descMap.attrId == '0508') {
-        event.name = 'rmsCurrent'
-        event.value = getCurrent(attribute.value)
-        event.unit = 'A'
-    } else if (descMap.cluster == '0B04' && descMap.attrId == '0551') {
-        BigInteger energy = getEnergy(descMap.value)
-        log.trace "TH112XZB >> Skipping duplicate event[0551] energy': ${energy}"
-        return [:]
-    } else {
-        log.warn "TH112XZB >> parse(descMap) ==> Unhandled attribute: ${descMap}"
-        return [:]
-    }
-    event.descriptionText = generateDescription(event)
-
-    if (settings.trace) {
-        log.trace "TH112XZB >> parse(description) ==> ${event.name}: ${event.value}"
-    }
-    return event
-}
-
 void unlock() {
     if (settings.trace) {
         log.trace 'TH112XZB >> unlock()'
@@ -467,6 +372,101 @@ void handlePowerOutage() {
     sendCommands(cmds)
     // Clock can be desynced with time (i.e. after a power outage or summer time)
     setClockTime()
+}
+
+private List<Map> parseMap(Map descMap) {
+    Map event = [:]
+    if (descMap.cluster == '0201' && descMap.attrId == '0000') {
+        String scale = getTemperatureScale()
+        event.name = 'temperature'
+        event.value = getTemperatureValue(descMap.value, scale)
+        event.unit = "°${scale}"
+    } else if (descMap.cluster == '0201' && descMap.attrId == '0008') {
+        Integer heatingDemand = getHeatingDemand(descMap.value)
+        event.name = 'heatingDemand'
+        event.value = heatingDemand
+        event.unit = '%'
+
+        String operatingState = (event.value.toInteger() < 10) ? 'idle' : 'heating'
+        Map opEvent = ['name': 'thermostatOperatingState', 'value': operatingState]
+        opEvent.descriptionText = generateDescription(opEvent)
+        if (settings.trace) {
+            log.trace "TH112XZB >> parse(description)[generated] ==> ${opEvent.name}: ${opEvent.value}"
+        }
+        sendEvent(opEvent)
+
+        Integer maxPower = device.currentValue('maxPower')
+        if (maxPower != null) {
+            Integer power = Math.round(maxPower * heatingDemand / 100)
+            Map powerEvent = [name: 'power', value: power, unit: 'W']
+            powerEvent.descriptionText = generateDescription(powerEvent)
+            if (settings.trace) {
+                log.trace "TH112XZB >> parse(description)[generated] ==> ${powerEvent.name}: ${powerEvent.value}"
+            }
+            sendEvent(powerEvent)
+        }
+    } else if (descMap.cluster == '0702' && descMap.attrId == '0000') {
+        BigInteger energy = getEnergy(descMap.value)
+        Double previousEnergy = device.currentValue('energy')
+        if (energy < previousEnergy) {
+            // When a baseboard heater is too hot, a short circuit is created for few seconds until the unit cools down.
+            // This kind of power outage, reset to an old "random" value
+            // Note: For some unknown reason, power outage from electrical board doesn't reset value ...
+            // If you have this warning you should verify that nothing prevents the release of heat from your heater
+            // (ex: curtains, bedding, reverse installation, etc)
+            /* groovylint-disable-next-line LineLength */
+            log.warn "TH112XZB >> Energy[${energy}] is lower than previous one[${previousEnergy}] (Caused: short circuit from heater)"
+        }
+        event.name = 'energy'
+        event.value = energy / 1000
+        event.unit = 'kWh'
+    } else if (descMap.cluster == '0B04' && descMap.attrId == '050B') {
+        event.name = 'power'
+        event.value = getPower(descMap.value)
+        event.unit = 'W'
+    } else if (descMap.cluster == '0B04' && descMap.attrId == '050D') {
+        event.name = 'maxPower'
+        event.value = getPower(descMap.value)
+        event.unit = 'W'
+    } else if (descMap.cluster == '0201' && descMap.attrId == '0012') {
+        String scale = getTemperatureScale()
+        event.name = 'heatingSetpoint'
+        event.value = getTemperatureValue(descMap.value, scale, true)
+        event.unit = "°${scale}"
+    } else if (descMap.cluster == '0201' && descMap.attrId == '0014') {
+        String scale = getTemperatureScale()
+        event.name = 'heatingSetpoint'
+        event.value = getTemperatureValue(descMap.value, scale, true)
+        event.unit = "°${scale}"
+    } else if (descMap.cluster == '0201' && descMap.attrId == '001C') {
+        event.name = 'thermostatMode'
+        event.value = getModeMap()[descMap.value]
+    } else if (descMap.cluster == '0204' && descMap.attrId == '0001') {
+        event.name = 'lock'
+        event.value = getLockMap()[descMap.value]
+    } else if (descMap.cluster == '0B04' && descMap.attrId == '0505') {
+        // This event seems to be triggered automatically after each 18 hours
+        event.name = 'rmsVoltage'
+        event.value = getVoltage(descMap.value)
+        event.unit = 'V'
+    } else if (descMap.cluster == '0B04' && descMap.attrId == '0508') {
+        event.name = 'rmsCurrent'
+        event.value = getCurrent(attribute.value)
+        event.unit = 'A'
+    } else if (descMap.cluster == '0B04' && descMap.attrId == '0551') {
+        BigInteger energy = getEnergy(descMap.value)
+        log.trace "TH112XZB >> Skipping duplicate event[0551] energy': ${energy}"
+        return [:]
+    } else {
+        log.warn "TH112XZB >> parse(descMap) ==> Unhandled attribute: ${descMap}"
+        return [:]
+    }
+    event.descriptionText = generateDescription(event)
+
+    if (settings.trace) {
+        log.trace "TH112XZB >> parse(description) ==> ${event.name}: ${event.value}"
+    }
+    return event
 }
 
 private String generateDescription(Map event) {
