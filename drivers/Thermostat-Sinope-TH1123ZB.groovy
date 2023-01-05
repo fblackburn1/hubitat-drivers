@@ -4,6 +4,7 @@
  *  Thermostat Sinopé TH1123ZB-TH1124ZB Driver
  *
  *  1.0 (2022-12-31): initial release
+ *  1.1 (2022-01-04): Handled short circuit and rmsVoltage/rmsCurrent
  *  Author: fblackburn
  *  Inspired by:
  *    - Sinope => https://github.com/SmartThingsCommunity/SmartThingsPublic/tree/master/devicetypes/sinope-technologies
