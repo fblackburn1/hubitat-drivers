@@ -482,7 +482,7 @@ private Map extractEvent(Map descMap) {
 
 private String generateDescription(Map event) {
     String description = null
-    if (event.name && event.value) {
+    if (event.name != null && event.value != null) {
         description = "${device.getLabel()} ${event.name} is ${event.value}"
         if (event.unit) {
             description = "${description}${event.unit}"
