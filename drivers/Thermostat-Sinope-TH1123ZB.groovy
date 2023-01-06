@@ -171,12 +171,33 @@ List<Map> parse(String description) {
     }
 
     Map descMap = zigbee.parseDescriptionAsMap(description)
-    List<Map> events = [generateEvent(descMap)]
+    Map event = extractEvent(descMap)
+    List<Map> events = [event]
+    if (event.name == 'heatingDemand') {
+        String operatingState = (event.value.toInteger() < 10) ? 'idle' : 'heating'
+        Map opEvent = ['name': 'thermostatOperatingState', 'value': operatingState]
+        opEvent.descriptionText = generateDescription(opEvent)
+        if (settings.trace) {
+            log.trace "TH112XZB >> parse(description)[generated] ==> ${opEvent.name}: ${opEvent.value}"
+        }
+        events.add(opEvent)
+
+        Integer maxPower = device.currentValue('maxPower')
+        if (maxPower != null) {
+            Integer power = Math.round(maxPower * event.value / 100)
+            Map powerEvent = [name: 'power', value: power, unit: 'W']
+            powerEvent.descriptionText = generateDescription(powerEvent)
+            if (settings.trace) {
+                log.trace "TH112XZB >> parse(description)[generated] ==> ${powerEvent.name}: ${powerEvent.value}"
+            }
+            events.add(powerEvent)
+        }
+    }
     if (descMap.additionalAttrs) {
         // From test, only (cluster: 0B04 / attrId: 0505) has additionalAttrs
-        descMap.additionalAttrs.each { attribute ->
+        descMap.additionalAttrs.each { Map attribute ->
             attribute.cluster = attribute.cluster ? attribute.cluster : descMap.cluster
-            events += generateEvent(attribute)
+            events.add(extractEvent(attribute))
         }
     }
     return events
@@ -377,7 +398,7 @@ void handlePowerOutage() {
     setClockTime()
 }
 
-private Map generateEvent(Map descMap) {
+private Map extractEvent(Map descMap) {
     Map event = [:]
     if (descMap.cluster == '0201' && descMap.attrId == '0000') {
         String scale = getTemperatureScale()
@@ -385,29 +406,9 @@ private Map generateEvent(Map descMap) {
         event.value = getTemperatureValue(descMap.value, scale)
         event.unit = "°${scale}"
     } else if (descMap.cluster == '0201' && descMap.attrId == '0008') {
-        Integer heatingDemand = getHeatingDemand(descMap.value)
         event.name = 'heatingDemand'
-        event.value = heatingDemand
+        event.value = getHeatingDemand(descMap.value)
         event.unit = '%'
-
-        String operatingState = (event.value.toInteger() < 10) ? 'idle' : 'heating'
-        Map opEvent = ['name': 'thermostatOperatingState', 'value': operatingState]
-        opEvent.descriptionText = generateDescription(opEvent)
-        if (settings.trace) {
-            log.trace "TH112XZB >> parse(description)[generated] ==> ${opEvent.name}: ${opEvent.value}"
-        }
-        sendEvent(opEvent)
-
-        Integer maxPower = device.currentValue('maxPower')
-        if (maxPower != null) {
-            Integer power = Math.round(maxPower * heatingDemand / 100)
-            Map powerEvent = [name: 'power', value: power, unit: 'W']
-            powerEvent.descriptionText = generateDescription(powerEvent)
-            if (settings.trace) {
-                log.trace "TH112XZB >> parse(description)[generated] ==> ${powerEvent.name}: ${powerEvent.value}"
-            }
-            sendEvent(powerEvent)
-        }
     } else if (descMap.cluster == '0702' && descMap.attrId == '0000') {
         BigInteger energy = getEnergy(descMap.value)
         Double previousEnergy = device.currentValue('energy')
