@@ -121,7 +121,7 @@ Map parse(String description) {
         log.warn "SP2600ZB >> parse(descMap) ==> Unhandled attribute: ${descMap}"
     }
 
-    if (event.name && event.value) {
+    if (event.name != null && event.value != null) {
         event.descriptionText = "${device.getLabel()} ${event.name} is ${event.value}"
         if (event.unit) {
             event.descriptionText = "${event.descriptionText}${event.unit}"
