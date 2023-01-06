@@ -245,6 +245,8 @@ void refresh() {
     cmds += zigbee.readAttribute(0x0201, 0x0008) // PI heating demand
     cmds += zigbee.readAttribute(0x0201, 0x001C) // System Mode
     cmds += zigbee.readAttribute(0x0204, 0x0001) // Keypad lock
+    cmds += zigbee.readAttribute(0x0B04, 0x0505) // RMS Voltage
+    cmds += zigbee.readAttribute(0x0B04, 0x0508) // RMS Current
     cmds += zigbee.readAttribute(0x0B04, 0x050B) // Active power
     cmds += zigbee.readAttribute(0x0B04, 0x050D) // Maximum power available
     cmds += zigbee.readAttribute(0x0702, 0x0000) // Total Energy
