@@ -30,10 +30,10 @@ metadata
         capability 'Lock'
         capability 'PowerMeter'
         capability 'EnergyMeter'
+        capability 'CurrentMeter'
+        capability 'VoltageMeasurement'
 
         attribute 'maxPower', 'number'
-        attribute 'rmsVoltage', 'number'
-        attribute 'rmsCurrent', 'number'
 
         command(
             'setThermostatMode',
@@ -455,12 +455,12 @@ private Map extractEvent(Map descMap) {
         event.value = getLockMap()[descMap.value]
     } else if (descMap.cluster == '0B04' && descMap.attrId == '0505') {
         // This event seems to be triggered automatically after each 18 hours
-        event.name = 'rmsVoltage'
+        event.name = 'voltage'
         event.value = getVoltage(descMap.value)
         event.unit = 'V'
     } else if (descMap.cluster == '0B04' && descMap.attrId == '0508') {
-        event.name = 'rmsCurrent'
-        event.value = getCurrent(descMap.value)
+        event.name = 'amperage'
+        event.value = getAmperage(descMap.value)
         event.unit = 'A'
     } else if (descMap.cluster == '0B04' && descMap.attrId == '0551') {
         if (settings.trace) {
@@ -608,7 +608,7 @@ private Double getVoltage(String value) {
     return Integer.parseInt(value, 16) / 10
 }
 
-private Double getCurrent(String value) {
+private Double getAmperage(String value) {
     if (value == null) {
         return 0
     }
