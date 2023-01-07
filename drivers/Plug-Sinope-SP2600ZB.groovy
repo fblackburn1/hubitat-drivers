@@ -76,10 +76,6 @@ void configure() {
         unschedule()
     } catch (ignored) { }
 
-    if (device.currentValue('energy') == null) {
-        sendEvent(name: 'energy', value: 0, unit: 'kWh')
-    }
-
     List cmds = []
     cmds += zigbee.configureReporting(0x0006, 0x0000, DataType.BOOLEAN, 0, 600, null) // State
     Integer powerChange = settings.powerChange == null ? getDefaultPowerChange() : settings.powerChange
