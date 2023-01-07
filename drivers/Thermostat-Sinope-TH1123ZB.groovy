@@ -194,12 +194,13 @@ List<Map> parse(String description) {
         }
     }
     if (descMap.additionalAttrs) {
-        // From test, only (cluster: 0B04 / attrId: 0505) has additionalAttrs
+        // When many events from same cluster must be sent at the same time,
+        // device other events in additionalAttrs instead of sending several
         if (settings.trace) {
             log.trace "TH112XZB >> Found additionalAttrs: ${descMap}"
         }
         descMap.additionalAttrs.each { Map attribute ->
-            attribute.cluster = attribute.cluster ? attribute.cluster : descMap.cluster
+            attribute.cluster = descMap.cluster
             events.add(extractEvent(attribute))
         }
     }
