@@ -3,7 +3,8 @@
 /**
  *  Sinope Zigbee Plug (SP2600ZB) Device Driver for Hubitat
  *
- *  1.0 (2022-12-18): initial release
+ *  1.0 (2022-12-18): Initial release
+ *  1.1 (2023-01-15): Set power to 0 when below treshold
  *  Author: fblackburn
  *  Inspired by:
  *    - Sinope => https://github.com/SmartThingsCommunity/SmartThingsPublic/tree/master/devicetypes/sinope-technologies
@@ -32,7 +33,10 @@ metadata
             name: 'powerChange',
             type: 'number',
             title: 'Power Change',
-            description: 'Difference of watts to trigger power report (1..10000)',
+            description: '''
+                |Difference of watts to trigger power report (1..10000).
+                |Also, power below this value will be considered as 0
+            |'''.stripMargin(),
             range: '1..10000',
             defaultValue: getDefaultPowerChange()
         )
@@ -76,10 +80,6 @@ void configure() {
         unschedule()
     } catch (ignored) { }
 
-    if (device.currentValue('energy') == null) {
-        sendEvent(name: 'energy', value: 0, unit: 'kWh')
-    }
-
     List cmds = []
     cmds += zigbee.configureReporting(0x0006, 0x0000, DataType.BOOLEAN, 0, 600, null) // State
     Integer powerChange = settings.powerChange == null ? getDefaultPowerChange() : settings.powerChange
@@ -105,8 +105,21 @@ Map parse(String description) {
         event.name = 'switch'
         event.value = getSwitchMap()[descMap.value]
     } else if (descMap.cluster == '0B04' && descMap.attrId == '050B') {
+        Double power = getPower(descMap.value)
+        Double oldPower = device.currentValue('power')
+        if (power != 0.0 && power < oldPower) {  // check if power decrease
+            Integer powerChange = settings.powerChange == null ? getDefaultPowerChange() : settings.powerChange
+            if (power < powerChange) {
+                // No other even will be sent if power is lower than powerChange
+                // So we will prioritze to send 0 value instead of the "real" value
+                if (settings.trace) {
+                    log.trace "SP2600ZB >> power(${power}) hardcoded to 0"
+                }
+                power = 0.0
+            }
+        }
         event.name = 'power'
-        event.value = getPower(descMap.value)
+        event.value = power
         event.unit = 'W'
     } else if (descMap.cluster == '0702' && descMap.attrId == '0000') {
         BigInteger newEnergyValue = getEnergy(descMap.value)
@@ -121,7 +134,7 @@ Map parse(String description) {
         log.warn "SP2600ZB >> parse(descMap) ==> Unhandled attribute: ${descMap}"
     }
 
-    if (event.name && event.value) {
+    if (event.name != null && event.value != null) {
         event.descriptionText = "${device.getLabel()} ${event.name} is ${event.value}"
         if (event.unit) {
             event.descriptionText = "${event.descriptionText}${event.unit}"

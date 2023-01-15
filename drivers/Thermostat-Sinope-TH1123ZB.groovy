@@ -3,7 +3,8 @@
 /**
  *  Thermostat Sinopé TH1123ZB-TH1124ZB Driver
  *
- *  1.0 (2022-12-31): initial release
+ *  1.0 (2022-12-31): Initial release
+ *  1.1 (2022-01-04): Handled short circuit and rmsVoltage/rmsCurrent
  *  Author: fblackburn
  *  Inspired by:
  *    - Sinope => https://github.com/SmartThingsCommunity/SmartThingsPublic/tree/master/devicetypes/sinope-technologies
@@ -29,6 +30,8 @@ metadata
         capability 'Lock'
         capability 'PowerMeter'
         capability 'EnergyMeter'
+        capability 'CurrentMeter'
+        capability 'VoltageMeasurement'
 
         attribute 'maxPower', 'number'
 
@@ -159,89 +162,49 @@ void uninstalled() {
     unschedule()
 }
 
-Map parse(String description) {
+List<Map> parse(String description) {
     if (!description?.startsWith('read attr -')) {
         if (!description?.startsWith('catchall:')) {
             log.warn "TH112XZB >> parse(description) ==> Unhandled event: ${description}"
         }
-        return [:]
+        return []
     }
 
-    Map event = [:]
     Map descMap = zigbee.parseDescriptionAsMap(description)
-    if (descMap.cluster == '0201' && descMap.attrId == '0000') {
-        String scale = getTemperatureScale()
-        event.name = 'temperature'
-        event.value = getTemperatureValue(descMap.value, scale)
-        event.unit = "°${scale}"
-    } else if (descMap.cluster == '0201' && descMap.attrId == '0008') {
-        Integer heatingDemand = getHeatingDemand(descMap.value)
-        event.name = 'heatingDemand'
-        event.value = heatingDemand
-        event.unit = '%'
-
+    Map event = extractEvent(descMap)
+    List<Map> events = [event]
+    if (event.name == 'heatingDemand') {
         String operatingState = (event.value.toInteger() < 10) ? 'idle' : 'heating'
         Map opEvent = ['name': 'thermostatOperatingState', 'value': operatingState]
         opEvent.descriptionText = generateDescription(opEvent)
         if (settings.trace) {
             log.trace "TH112XZB >> parse(description)[generated] ==> ${opEvent.name}: ${opEvent.value}"
         }
-        sendEvent(opEvent)
+        events.add(opEvent)
 
         Integer maxPower = device.currentValue('maxPower')
         if (maxPower != null) {
-            Integer power = Math.round(maxPower * heatingDemand / 100)
+            Integer power = Math.round(maxPower * event.value / 100)
             Map powerEvent = [name: 'power', value: power, unit: 'W']
             powerEvent.descriptionText = generateDescription(powerEvent)
             if (settings.trace) {
                 log.trace "TH112XZB >> parse(description)[generated] ==> ${powerEvent.name}: ${powerEvent.value}"
             }
-            sendEvent(powerEvent)
+            events.add(powerEvent)
         }
-    } else if (descMap.cluster == '0702' && descMap.attrId == '0000') {
-        BigInteger energy = getEnergy(descMap.value)
-        if (energy == 0) {
-            // FIXME Not able to reproduce this behavior with TH112XZB
-            log.warn 'TH112XZB >> Ignoring energy event (Caused: unknown)'
-        } else {
-            event.name = 'energy'
-            event.value = energy / 1000
-            event.unit = 'kWh'
+    }
+    if (descMap.additionalAttrs) {
+        // When many events from same cluster must be sent at the same time,
+        // device other events in additionalAttrs instead of sending several
+        if (settings.trace) {
+            log.trace "TH112XZB >> Found additionalAttrs: ${descMap}"
         }
-    } else if (descMap.cluster == '0B04' && descMap.attrId == '050B') {
-        event.name = 'power'
-        event.value = getPower(descMap.value)
-        event.unit = 'W'
-    } else if (descMap.cluster == '0B04' && descMap.attrId == '050D') {
-        event.name = 'maxPower'
-        event.value = getPower(descMap.value)
-        event.unit = 'W'
-    } else if (descMap.cluster == '0201' && descMap.attrId == '0012') {
-        String scale = getTemperatureScale()
-        event.name = 'heatingSetpoint'
-        event.value = getTemperatureValue(descMap.value, scale, true)
-        event.unit = "°${scale}"
-    } else if (descMap.cluster == '0201' && descMap.attrId == '0014') {
-        String scale = getTemperatureScale()
-        event.name = 'heatingSetpoint'
-        event.value = getTemperatureValue(descMap.value, scale, true)
-        event.unit = "°${scale}"
-    } else if (descMap.cluster == '0201' && descMap.attrId == '001C') {
-        event.name = 'thermostatMode'
-        event.value = getModeMap()[descMap.value]
-    } else if (descMap.cluster == '0204' && descMap.attrId == '0001') {
-        event.name = 'lock'
-        event.value = getLockMap()[descMap.value]
-    } else {
-        log.warn "TH112XZB >> parse(descMap) ==> Unhandled attribute: ${descMap}"
-        return [:]
+        descMap.additionalAttrs.each { Map attribute ->
+            attribute.cluster = descMap.cluster
+            events.add(extractEvent(attribute))
+        }
     }
-    event.descriptionText = generateDescription(event)
-
-    if (settings.trace) {
-        log.trace "TH112XZB >> parse(description) ==> ${event.name}: ${event.value}"
-    }
-    return event
+    return events
 }
 
 void unlock() {
@@ -286,6 +249,8 @@ void refresh() {
     cmds += zigbee.readAttribute(0x0201, 0x0008) // PI heating demand
     cmds += zigbee.readAttribute(0x0201, 0x001C) // System Mode
     cmds += zigbee.readAttribute(0x0204, 0x0001) // Keypad lock
+    cmds += zigbee.readAttribute(0x0B04, 0x0505) // RMS Voltage
+    cmds += zigbee.readAttribute(0x0B04, 0x0508) // RMS Current
     cmds += zigbee.readAttribute(0x0B04, 0x050B) // Active power
     cmds += zigbee.readAttribute(0x0B04, 0x050D) // Maximum power available
     cmds += zigbee.readAttribute(0x0702, 0x0000) // Total Energy
@@ -335,7 +300,6 @@ void setClockTime() {
     if (settings.trace) {
         log.trace 'TH112XZB >> setClockTime()'
     }
-
 
     /* groovylint-disable-next-line NoJavaUtilDate */
     Date now = new Date()
@@ -440,9 +404,84 @@ void handlePowerOutage() {
     setClockTime()
 }
 
+private Map extractEvent(Map descMap) {
+    Map event = [:]
+    if (descMap.cluster == '0201' && descMap.attrId == '0000') {
+        String scale = getTemperatureScale()
+        event.name = 'temperature'
+        event.value = getTemperatureValue(descMap.value, scale)
+        event.unit = "°${scale}"
+    } else if (descMap.cluster == '0201' && descMap.attrId == '0008') {
+        event.name = 'heatingDemand'
+        event.value = getHeatingDemand(descMap.value)
+        event.unit = '%'
+    } else if (descMap.cluster == '0702' && descMap.attrId == '0000') {
+        BigInteger energy = getEnergy(descMap.value)
+        Double previousEnergy = device.currentValue('energy')
+        if (energy < previousEnergy) {
+            // When a baseboard heater is too hot, a short circuit is created for few seconds until the unit cools down.
+            // This kind of power outage, reset to an old "random" value
+            // Note: For some unknown reason, power outage from electrical board doesn't reset value ...
+            // If you have this warning you should verify that nothing prevents the release of heat from your heater
+            // (ex: curtains, bedding, reverse installation, etc)
+            /* groovylint-disable-next-line LineLength */
+            log.warn "TH112XZB >> Energy[${energy}] is lower than previous one[${previousEnergy}] (Caused: short circuit from heater)"
+        }
+        event.name = 'energy'
+        event.value = energy / 1000
+        event.unit = 'kWh'
+    } else if (descMap.cluster == '0B04' && descMap.attrId == '050B') {
+        event.name = 'power'
+        event.value = getPower(descMap.value)
+        event.unit = 'W'
+    } else if (descMap.cluster == '0B04' && descMap.attrId == '050D') {
+        event.name = 'maxPower'
+        event.value = getPower(descMap.value)
+        event.unit = 'W'
+    } else if (descMap.cluster == '0201' && descMap.attrId == '0012') {
+        String scale = getTemperatureScale()
+        event.name = 'heatingSetpoint'
+        event.value = getTemperatureValue(descMap.value, scale, true)
+        event.unit = "°${scale}"
+    } else if (descMap.cluster == '0201' && descMap.attrId == '0014') {
+        String scale = getTemperatureScale()
+        event.name = 'heatingSetpoint'
+        event.value = getTemperatureValue(descMap.value, scale, true)
+        event.unit = "°${scale}"
+    } else if (descMap.cluster == '0201' && descMap.attrId == '001C') {
+        event.name = 'thermostatMode'
+        event.value = getModeMap()[descMap.value]
+    } else if (descMap.cluster == '0204' && descMap.attrId == '0001') {
+        event.name = 'lock'
+        event.value = getLockMap()[descMap.value]
+    } else if (descMap.cluster == '0B04' && descMap.attrId == '0505') {
+        // This event seems to be triggered automatically after each 18 hours
+        event.name = 'voltage'
+        event.value = getVoltage(descMap.value)
+        event.unit = 'V'
+    } else if (descMap.cluster == '0B04' && descMap.attrId == '0508') {
+        event.name = 'amperage'
+        event.value = getAmperage(descMap.value)
+        event.unit = 'A'
+    } else if (descMap.cluster == '0B04' && descMap.attrId == '0551') {
+        BigInteger energy = getEnergy(descMap.value)
+        log.trace "TH112XZB >> Skipping duplicate event[0551] energy': ${energy}"
+        return [:]
+    } else {
+        log.warn "TH112XZB >> parse(descMap) ==> Unhandled attribute: ${descMap}"
+        return [:]
+    }
+    event.descriptionText = generateDescription(event)
+
+    if (settings.trace) {
+        log.trace "TH112XZB >> parse(description) ==> ${event.name}: ${event.value}"
+    }
+    return event
+}
+
 private String generateDescription(Map event) {
     String description = null
-    if (event.name && event.value) {
+    if (event.name != null && event.value != null) {
         description = "${device.getLabel()} ${event.name} is ${event.value}"
         if (event.unit) {
             description = "${description}${event.unit}"
@@ -559,6 +598,20 @@ private BigInteger getEnergy(String value) {
         return 0
     }
     return new BigInteger(value, 16)
+}
+
+private Double getVoltage(String value) {
+    if (value == null) {
+        return 0
+    }
+    return Integer.parseInt(value, 16) / 10
+}
+
+private Double getAmperage(String value) {
+    if (value == null) {
+        return 0
+    }
+    return Integer.parseInt(value, 16) / 1000
 }
 
 private Map getModeMap() {
