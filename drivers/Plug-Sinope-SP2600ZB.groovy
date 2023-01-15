@@ -32,7 +32,10 @@ metadata
             name: 'powerChange',
             type: 'number',
             title: 'Power Change',
-            description: 'Difference of watts to trigger power report (1..10000)',
+            description: '''
+                |Difference of watts to trigger power report (1..10000).
+                |Also, power below this value will be considered as 0
+            |'''.stripMargin(),
             range: '1..10000',
             defaultValue: getDefaultPowerChange()
         )
@@ -101,8 +104,21 @@ Map parse(String description) {
         event.name = 'switch'
         event.value = getSwitchMap()[descMap.value]
     } else if (descMap.cluster == '0B04' && descMap.attrId == '050B') {
+        Double power = getPower(descMap.value)
+        Double oldPower = device.currentValue('power')
+        if (power != 0.0 && power < oldPower) {  // check if power decrease
+            Integer powerChange = settings.powerChange == null ? getDefaultPowerChange() : settings.powerChange
+            if (power < powerChange) {
+                // No other even will be sent if power is lower than powerChange
+                // So we will prioritze to send 0 value instead of the "real" value
+                if (settings.trace) {
+                    log.trace "SP2600ZB >> power(${power}) hardcoded to 0"
+                }
+                power = 0.0
+            }
+        }
         event.name = 'power'
-        event.value = getPower(descMap.value)
+        event.value = power
         event.unit = 'W'
     } else if (descMap.cluster == '0702' && descMap.attrId == '0000') {
         BigInteger newEnergyValue = getEnergy(descMap.value)
