@@ -3,7 +3,8 @@
 /**
  *  Sinope Zigbee Plug (SP2600ZB) Device Driver for Hubitat
  *
- *  1.0 (2022-12-18): initial release
+ *  1.0 (2022-12-18): Initial release
+ *  1.1 (2023-01-15): Set power to 0 when below treshold
  *  Author: fblackburn
  *  Inspired by:
  *    - Sinope => https://github.com/SmartThingsCommunity/SmartThingsPublic/tree/master/devicetypes/sinope-technologies
