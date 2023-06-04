@@ -96,16 +96,70 @@ void configure() {
     sendCommands(cmds)
 }
 
-Map parse(String description) {
+List<Map> parse(String description) {
     if (!description?.startsWith('read attr -')) {
         if (!description?.startsWith('catchall:')) {
             log.warn "RM3500ZB >> parse(description) ==> Unhandled event: ${description}"
         }
-        return [:]
+        return []
     }
 
-    Map event = [:]
     Map descMap = zigbee.parseDescriptionAsMap(description)
+    Map event = extractEvent(descMap)
+    List<Map> events = [event]
+    if (descMap.additionalAttrs) {
+        // When many events from same cluster must be sent at the same time,
+        // device send other events in additionalAttrs instead of sending several
+        if (settings.trace) {
+            log.trace "TH112XZB >> Found additionalAttrs: ${descMap}"
+        }
+        descMap.additionalAttrs.each { Map attribute ->
+            attribute.cluster = descMap.cluster
+            events.add(extractEvent(attribute))
+        }
+    }
+    return events
+}
+
+void refresh() {
+    if (settings.trace) {
+        log.trace 'RM3500ZB >> refresh()'
+    }
+    if (state.updatedLastRanAt && now() < state.updatedLastRanAt + 2000) {
+        if (settings.trace) {
+            log.trace 'RM3500ZB >> refresh() ==> Ran within last 2 seconds so aborting'
+        }
+        return
+    }
+    state.updatedLastRanAt = now()
+
+    List cmds = []
+    cmds += zigbee.readAttribute(0x0006, 0x0000) // State
+    cmds += zigbee.readAttribute(0x0B04, 0x050B) // Active power
+    cmds += zigbee.readAttribute(0x0B04, 0x0505) // Voltage
+    cmds += zigbee.readAttribute(0x0702, 0x0000) // Energy delivered
+    cmds += zigbee.readAttribute(0x0402, 0x0000) // Temperature sensor
+    sendCommands(cmds)
+}
+
+void off() {
+    if (settings.trace) {
+        log.trace 'RM3500ZB >> off()'
+    }
+    List cmds = zigbee.command(0x0006, 0x00) // Off
+    sendCommands(cmds)
+}
+
+void on() {
+    if (settings.trace) {
+        log.trace 'RM3500ZB >> on()'
+    }
+    List cmds = zigbee.command(0x0006, 0x01) // On
+    sendCommands(cmds)
+}
+
+private Map extractEvent(Map descMap) {
+    Map event = [:]
     if (descMap.cluster == '0006' && descMap.attrId == '0000') {
         event.name = 'switch'
         event.value = getSwitchMap()[descMap.value]
@@ -159,49 +213,7 @@ Map parse(String description) {
     if (settings.trace) {
         log.trace "RM3500ZB >> parse(description) ==> ${event.name}: ${event.value}"
     }
-    if (descMap.additionalAttrs) {
-        if (settings.trace) {
-            log.warn "RM3500ZB >> Found additionalAttrs: ${descMap}"
-        }
-    }
     return event
-}
-
-void refresh() {
-    if (settings.trace) {
-        log.trace 'RM3500ZB >> refresh()'
-    }
-    if (state.updatedLastRanAt && now() < state.updatedLastRanAt + 2000) {
-        if (settings.trace) {
-            log.trace 'RM3500ZB >> refresh() ==> Ran within last 2 seconds so aborting'
-        }
-        return
-    }
-    state.updatedLastRanAt = now()
-
-    List cmds = []
-    cmds += zigbee.readAttribute(0x0006, 0x0000) // State
-    cmds += zigbee.readAttribute(0x0B04, 0x050B) // Active power
-    cmds += zigbee.readAttribute(0x0B04, 0x0505) // Voltage
-    cmds += zigbee.readAttribute(0x0702, 0x0000) // Energy delivered
-    cmds += zigbee.readAttribute(0x0402, 0x0000) // Temperature sensor
-    sendCommands(cmds)
-}
-
-void off() {
-    if (settings.trace) {
-        log.trace 'RM3500ZB >> off()'
-    }
-    List cmds = zigbee.command(0x0006, 0x00) // Off
-    sendCommands(cmds)
-}
-
-void on() {
-    if (settings.trace) {
-        log.trace 'RM3500ZB >> on()'
-    }
-    List cmds = zigbee.command(0x0006, 0x01) // On
-    sendCommands(cmds)
 }
 
 private void sendCommands(List<Map> commands) {
