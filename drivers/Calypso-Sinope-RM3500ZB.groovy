@@ -99,7 +99,9 @@ void configure() {
 
 List<Map> parse(String description) {
     if (!description?.startsWith('read attr -')) {
-        if (!description?.startsWith('catchall:')) {
+        if (description?.startsWith('zone')) {
+            log.trace "RM3500ZB >> parse(description) Ingoring zone event: ${description}"
+        } else if (!description?.startsWith('catchall:')) {
             log.warn "RM3500ZB >> parse(description) ==> Unhandled event: ${description}"
         }
         return []
