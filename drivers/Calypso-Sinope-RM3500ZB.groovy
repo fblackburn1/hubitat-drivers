@@ -25,6 +25,7 @@ metadata
         capability 'Outlet'
         capability 'PowerMeter'
         capability 'EnergyMeter'
+        capability 'TemperatureMeasurement'
     }
     preferences {
         input(
@@ -79,13 +80,18 @@ void configure() {
     } catch (ignored) { }
 
     List cmds = []
-    cmds += zigbee.configureReporting(0x0006, 0x0000, DataType.BOOLEAN, 0, 3600, null) // State
+    cmds += zigbee.configureReporting(0x0006, 0x0000, DataType.BOOLEAN, 0, 3600, null)            // State
+
+    Integer temperatureChange = 50 // 0.5 celcius
+    cmds += zigbee.configureReporting(0x0402, 0x0000, DataType.INT16, 30, 580, temperatureChange) // Temperature sensor
+
     Integer powerChange = settings.powerChange == null ? getDefaultPowerChange() : settings.powerChange
-    cmds += zigbee.configureReporting(0x0B04, 0x050B, DataType.INT16, 0, 600, powerChange) // Power
+    cmds += zigbee.configureReporting(0x0B04, 0x050B, DataType.INT16, 0, 600, powerChange)        // Power
+
     // Logic made by device to trigger an event:
     // if energyChange <= energyValue; then trigger event
     // Since energyValue will only increase with time, we can only use minReportTime (300)
-    cmds += zigbee.configureReporting(0x0702, 0x0000, DataType.UINT48, 300, 1800, 0) // Energy
+    cmds += zigbee.configureReporting(0x0702, 0x0000, DataType.UINT48, 300, 1800, 0)              // Energy
     sendCommands(cmds)
 }
 
@@ -128,6 +134,11 @@ Map parse(String description) {
             event.value = newEnergyValue / 1000
             event.unit = 'kWh'
         }
+    } else if (descMap.cluster == '0402' && descMap.attrId == '0000') {
+        String scale = getTemperatureScale()
+        event.name = 'temperature'
+        event.value = getTemperatureValue(descMap.value, scale)
+        event.unit = "°${scale}"
     } else {
         log.warn "RM3500ZB >> parse(descMap) ==> Unhandled attribute: ${descMap}"
     }
@@ -166,6 +177,7 @@ void refresh() {
     cmds += zigbee.readAttribute(0x0006, 0x0000) // State
     cmds += zigbee.readAttribute(0x0B04, 0x050B) // Active power
     cmds += zigbee.readAttribute(0x0702, 0x0000) // Energy delivered
+    cmds += zigbee.readAttribute(0x0402, 0x0000) // Temperature sensor
     sendCommands(cmds)
 }
 
@@ -209,6 +221,19 @@ private BigInteger getEnergy(String value) {
         return 0
     }
     return new BigInteger(value, 16)
+}
+
+private Double getTemperatureValue(String value, String scale) {
+    // 8000 is the value when sensor is not plugged
+    if (value == '8000' || value == null) {
+        return
+    }
+
+    Double celsius = (Integer.parseInt(value, 16) / 100).toDouble()
+    if (scale == 'C') {
+        return celsius.round(1)
+    }
+    return Math.round(celsiusToFahrenheit(celsius))
 }
 
 private Integer getDefaultPowerChange() {
