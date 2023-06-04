@@ -26,6 +26,7 @@ metadata
         capability 'PowerMeter'
         capability 'EnergyMeter'
         capability 'TemperatureMeasurement'
+        capability 'VoltageMeasurement'
     }
     preferences {
         input(
@@ -125,6 +126,11 @@ Map parse(String description) {
         event.name = 'power'
         event.value = power
         event.unit = 'W'
+    } else if (descMap.cluster == '0B04' && descMap.attrId == '0505') {
+        // This event seems to be triggered at same frequency than Power
+        event.name = 'voltage'
+        event.value = getVoltage(descMap.value)
+        event.unit = 'V'
     } else if (descMap.cluster == '0702' && descMap.attrId == '0000') {
         BigInteger newEnergyValue = getEnergy(descMap.value)
         if (newEnergyValue == 0) {
@@ -176,6 +182,7 @@ void refresh() {
     List cmds = []
     cmds += zigbee.readAttribute(0x0006, 0x0000) // State
     cmds += zigbee.readAttribute(0x0B04, 0x050B) // Active power
+    cmds += zigbee.readAttribute(0x0B04, 0x0505) // Voltage
     cmds += zigbee.readAttribute(0x0702, 0x0000) // Energy delivered
     cmds += zigbee.readAttribute(0x0402, 0x0000) // Temperature sensor
     sendCommands(cmds)
@@ -221,6 +228,13 @@ private BigInteger getEnergy(String value) {
         return 0
     }
     return new BigInteger(value, 16)
+}
+
+private Integer getVoltage(String value) {
+    if (value == null) {
+        return 0
+    }
+    return Integer.parseInt(value, 16)
 }
 
 private Double getTemperatureValue(String value, String scale) {
