@@ -5,6 +5,7 @@
  *
  *  1.0 (2022-12-31): Initial release
  *  1.1 (2022-01-04): Handled short circuit and rmsVoltage/rmsCurrent
+ *  1.2 (2024-11-25): Remove generic Thermostat capability
  *  Author: fblackburn
  *  Inspired by:
  *    - Sinope => https://github.com/SmartThingsCommunity/SmartThingsPublic/tree/master/devicetypes/sinope-technologies
@@ -22,15 +23,14 @@ metadata
         author: 'fblackburn',
     ) {
         capability 'Configuration'
-        capability 'Thermostat'
+        capability 'CurrentMeter'
+        capability 'EnergyMeter'
+        capability 'Lock'
+        capability 'PowerMeter'
         capability 'Refresh'
         capability 'TemperatureMeasurement'
         capability 'ThermostatHeatingSetpoint'
         capability 'ThermostatMode'
-        capability 'Lock'
-        capability 'PowerMeter'
-        capability 'EnergyMeter'
-        capability 'CurrentMeter'
         capability 'VoltageMeasurement'
 
         attribute 'maxPower', 'number'
@@ -69,11 +69,6 @@ metadata
         command('emergencyHeat', notSupported)
         command('auto', notSupported)
         command('cool', notSupported)
-        command('fanCirculate', notSupported)
-        command('fanOn', notSupported)
-        command('fanAuto', notSupported)
-        command('setThermostatFanMode', notSupported)
-        command('setCoolingSetpoint', notSupported)
 
         fingerprint(
             manufacturer: 'Sinope Technologies',
@@ -195,7 +190,7 @@ List<Map> parse(String description) {
     }
     if (descMap.additionalAttrs) {
         // When many events from same cluster must be sent at the same time,
-        // device other events in additionalAttrs instead of sending several
+        // device send other events in additionalAttrs instead of sending several
         if (settings.trace) {
             log.trace "TH112XZB >> Found additionalAttrs: ${descMap}"
         }
@@ -345,16 +340,6 @@ void cool() { return }
 void auto() { return }
 
 void emergencyHeat() { return }
-
-void setCoolingSetpoint() { return }
-
-void fanCirculate() { return }
-
-void fanOn() { return }
-
-void fanAuto() { return }
-
-void setThermostatFanMode() { return }
 
 List<String> getSupportedThermostatModes() {
     return ['heat', 'off']
