@@ -28,6 +28,9 @@ metadata
         capability 'TemperatureMeasurement'
         capability 'CurrentMeter'
         capability 'VoltageMeasurement'
+
+        command('enableSafetyWaterTemperature')
+        command('disableSafetyWaterTemperature')
     }
     preferences {
         input(
@@ -40,6 +43,14 @@ metadata
             |'''.stripMargin(),
             range: '1..10000',
             defaultValue: getDefaultPowerChange()
+        )
+        input(
+            name: 'safetyWaterTemperature',
+            type: 'number',
+            title: 'Set safety minimum water heater temperature (0 to disable)',
+            // According sinope: it should be configurable from 45 to 55 (and off)
+            range: '0..100',
+            defaultValue: getDefaultSafetyWaterTemperature()
         )
         input(
             name: 'trace',
@@ -88,12 +99,23 @@ void configure() {
     cmds += zigbee.configureReporting(0x0402, 0x0000, DataType.INT16, 30, 580, temperatureChange) // Temperature sensor
 
     Integer powerChange = settings.powerChange == null ? getDefaultPowerChange() : settings.powerChange
-    cmds += zigbee.configureReporting(0x0B04, 0x050B, DataType.INT16, 0, 600, powerChange)        // Power
+    cmds += zigbee.configureReporting(0x0B04, 0x050B, DataType.INT16, 0, 600, powerChange)   // Power
 
     // Logic made by device to trigger an event:
     // if energyChange <= energyValue; then trigger event
     // Since energyValue will only increase with time, we can only use minReportTime (300)
     cmds += zigbee.configureReporting(0x0702, 0x0000, DataType.UINT48, 300, 1800, 0)              // Energy
+
+    // Safety water temperature
+    Map params = [mfgCode: '0x119C']
+    Integer frequency = 24 * 60 * 60 // 24 hours
+    cmds += zigbee.configureReporting(0xFF01, 0x0076, DataType.UINT8, 0, frequency, null, params)
+    if (settings.safetyWaterTemperature == 0) {
+        disableSafetyWaterTemperature()
+    } else {
+        enableSafetyWaterTemperature()
+    }
+
     sendCommands(cmds)
 }
 
@@ -143,6 +165,8 @@ void refresh() {
     cmds += zigbee.readAttribute(0x0B04, 0x0508) // Amperage
     cmds += zigbee.readAttribute(0x0702, 0x0000) // Energy delivered
     cmds += zigbee.readAttribute(0x0402, 0x0000) // Temperature sensor
+    cmds += zigbee.readAttribute(0xFF01, 0x0076, [mfgCode: '0x119C']) // Water heater temperature safety
+
     sendCommands(cmds)
 }
 
@@ -159,6 +183,23 @@ void on() {
         log.trace 'RM3500ZB >> on()'
     }
     List cmds = zigbee.command(0x0006, 0x01) // On
+    sendCommands(cmds)
+}
+
+void enableSafetyWaterTemperature() {
+    if (settings.trace) {
+        log.trace 'RM3500ZB >> enableSafetyWaterTemperature()'
+    }
+    Integer safetyValue = settings.safetyWaterTemperature
+    List cmds = zigbee.writeAttribute(0xFF01, 0x0076, DataType.UINT8, safetyValue, [mfgCode: '0x119C'])
+    sendCommands(cmds)
+}
+
+void disableSafetyWaterTemperature() {
+    if (settings.trace) {
+        log.trace 'RM3500ZB >> disableSafetyWaterTemperature()'
+    }
+    List cmds = zigbee.writeAttribute(0xFF01, 0x0076, DataType.UINT8, 0, [mfgCode: '0x119C'])
     sendCommands(cmds)
 }
 
@@ -208,6 +249,26 @@ private Map extractEvent(Map descMap) {
         event.name = 'temperature'
         event.value = getTemperatureValue(descMap.value, scale)
         event.unit = "°${scale}"
+    } else if (descMap.cluster == 'FF01') {
+        switch (descMap.attrId) {
+            case '0076':
+                event.name = 'safetyWaterTemperature'
+                event.value = getSafetyWaterTemperature(descMap.value)
+                break
+
+            case '0070':
+            case '0200':
+            case '0283':
+                if (settings.trace) {
+                    log.trace "RM3500ZB >> parse(descMap) ==> Ignored attribute: ${descMap}"
+                }
+                break
+
+            default:
+                log.warn "RM3500ZB >> parse(descMap) ==> Unhandled attribute: ${descMap}"
+                break
+
+        }
     } else {
         log.warn "RM3500ZB >> parse(descMap) ==> Unhandled attribute: ${descMap}"
     }
@@ -278,6 +339,14 @@ private Double getTemperatureValue(String value, String scale) {
     return Math.round(celsiusToFahrenheit(celsius))
 }
 
+private Integer getSafetyWaterTemperature(String value) {
+    return Integer.parseInt(value, 16)
+}
+
 private Integer getDefaultPowerChange() {
     return 10
+}
+
+private Integer getDefaultSafetyWaterTemperature() {
+    return 45
 }
