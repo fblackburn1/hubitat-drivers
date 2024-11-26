@@ -28,7 +28,7 @@ metadata
         capability 'TemperatureMeasurement'
         capability 'CurrentMeter'
         capability 'VoltageMeasurement'
-        capability "WaterSensor"
+        capability 'WaterSensor'
 
         command('enableSafetyWaterTemperature')
         command('disableSafetyWaterTemperature')
@@ -274,7 +274,6 @@ private Map extractEvent(Map descMap) {
             default:
                 log.warn "RM3500ZB >> parse(descMap) ==> Unhandled attribute: ${descMap}"
                 break
-
         }
     } else {
         log.warn "RM3500ZB >> parse(descMap) ==> Unhandled attribute: ${descMap}"
