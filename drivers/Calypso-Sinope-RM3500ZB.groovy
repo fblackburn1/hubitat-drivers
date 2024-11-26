@@ -1,4 +1,4 @@
-/* groovylint-disable DuplicateNumberLiteral */
+/* groovylint-disable DuplicateMapLiteral, DuplicateNumberLiteral */
 /* groovylint-disable UnnecessaryGetter */
 /**
  *  Sinope Zigbee Plug (RM3500ZB) Device Driver for Hubitat
@@ -241,7 +241,7 @@ private Double getPower(String value) {
     if (value == null) {
         return
     }
-    return Integer.parseInt(value, 16) / 10
+    return Integer.parseInt(value, 16)
 }
 
 private BigInteger getEnergy(String value) {
