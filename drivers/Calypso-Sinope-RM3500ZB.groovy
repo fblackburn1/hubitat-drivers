@@ -28,6 +28,7 @@ metadata
         capability 'TemperatureMeasurement'
         capability 'CurrentMeter'
         capability 'VoltageMeasurement'
+        capability "WaterSensor"
 
         command('enableSafetyWaterTemperature')
         command('disableSafetyWaterTemperature')
@@ -116,6 +117,8 @@ void configure() {
         enableSafetyWaterTemperature()
     }
 
+    // Water leak sensor state
+    cmds += zigbee.configureReporting(0x0500, 0x0002, DataType.BITMAP16, 0, frequency, 0)
     sendCommands(cmds)
 }
 
@@ -166,6 +169,7 @@ void refresh() {
     cmds += zigbee.readAttribute(0x0702, 0x0000) // Energy delivered
     cmds += zigbee.readAttribute(0x0402, 0x0000) // Temperature sensor
     cmds += zigbee.readAttribute(0xFF01, 0x0076, [mfgCode: '0x119C']) // Water heater temperature safety
+    cmds += zigbee.readAttribute(0x0500, 0x0002) // Read Water leak
 
     sendCommands(cmds)
 }
@@ -249,6 +253,9 @@ private Map extractEvent(Map descMap) {
         event.name = 'temperature'
         event.value = getTemperatureValue(descMap.value, scale)
         event.unit = "°${scale}"
+    } else if (descMap.cluster == '0500' && descMap.attrId == '0002') {
+        event.name = 'water'
+        event.value = getWaterSensorValue(descMap.value)
     } else if (descMap.cluster == 'FF01') {
         switch (descMap.attrId) {
             case '0076':
@@ -337,6 +344,15 @@ private Double getTemperatureValue(String value, String scale) {
         return celsius.round(1)
     }
     return Math.round(celsiusToFahrenheit(celsius))
+}
+
+private String getWaterSensorValue(String value) {
+    if (value == '0030') {
+        return 'dry'
+    }
+    if (value == '0031') {
+        return 'wet'
+    }
 }
 
 private Integer getSafetyWaterTemperature(String value) {
